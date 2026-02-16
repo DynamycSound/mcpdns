@@ -1298,8 +1298,25 @@ async function domainReport(domain) {
 
 const SERVER_CARD = {
   name: "mcp-domain-lookup",
+  displayName: "Domain Inspector",
   description: "The most comprehensive domain intelligence MCP server. 15 tools for DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
   version: "2.0.0",
+  homepage: "https://mcpdns.onrender.com",
+  icons: [{ src: "https://mcpdns.onrender.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] }],
+  config: {
+    schema: {
+      type: "object",
+      properties: {
+        timeout: {
+          type: "number",
+          title: "Request Timeout (ms)",
+          description: "Maximum time in milliseconds for each tool request. Default is 30000 (30 seconds).",
+          default: 30000,
+        },
+      },
+      required: [],
+    },
+  },
   tools: [
     {
       name: "domain_report",
@@ -1393,7 +1410,8 @@ function createMcpServer() {
   server.tool(
     "domain_report",
     "Get a complete domain intelligence report. Runs ALL checks at once: DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, and domain age. This is the recommended starting tool.",
-    { domain: z.string().describe("Domain to analyze") },
+    { domain: z.string().describe("Domain to analyze (e.g. example.com)") },
+    { title: "Domain Report", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await domainReport(domain);
       return { content: [{ type: "text", text }] };
@@ -1411,6 +1429,7 @@ function createMcpServer() {
         .default("ALL")
         .describe("DNS record type to query. Use ALL to fetch every type."),
     },
+    { title: "DNS Lookup", readOnlyHint: true, openWorldHint: true },
     async ({ domain, record_type }) => {
       const text = await dnsLookup(domain, record_type);
       return { content: [{ type: "text", text }] };
@@ -1422,6 +1441,7 @@ function createMcpServer() {
     "whois_lookup",
     "Get WHOIS registration data for a domain including registrar, creation/expiry dates, and days remaining.",
     { domain: z.string().describe("Domain name to look up (e.g. example.com)") },
+    { title: "WHOIS Lookup", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await whoisLookup(domain);
       return { content: [{ type: "text", text }] };
@@ -1433,6 +1453,7 @@ function createMcpServer() {
     "domain_available",
     "Check whether a domain is available for registration. Suggests alternative TLDs if the domain is taken.",
     { domain: z.string().describe("Domain name to check (e.g. example.com)") },
+    { title: "Domain Availability", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await domainAvailable(domain);
       return { content: [{ type: "text", text }] };
@@ -1444,6 +1465,7 @@ function createMcpServer() {
     "email_config_check",
     "Audit email security configuration: MX, SPF, DKIM (common selectors), and DMARC records. Returns a letter grade A–F.",
     { domain: z.string().describe("Domain name to audit (e.g. example.com)") },
+    { title: "Email Security Audit", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await emailConfigCheck(domain);
       return { content: [{ type: "text", text }] };
@@ -1455,6 +1477,7 @@ function createMcpServer() {
     "ssl_check",
     "Check SSL/TLS certificate details for a domain: issuer, validity dates, days remaining, protocol, and fingerprint.",
     { domain: z.string().describe("Domain or hostname to check (e.g. example.com)") },
+    { title: "SSL Certificate Check", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await sslCheck(domain);
       return { content: [{ type: "text", text }] };
@@ -1465,7 +1488,8 @@ function createMcpServer() {
   server.tool(
     "reverse_dns",
     "Reverse DNS lookup — convert an IP address to its hostname(s), or find the IP behind a domain and do reverse lookup.",
-    { target: z.string().describe("IP address or domain name") },
+    { target: z.string().describe("IP address or domain name (e.g. 8.8.8.8 or example.com)") },
+    { title: "Reverse DNS", readOnlyHint: true, openWorldHint: true },
     async ({ target }) => {
       const text = await reverseDns(target);
       return { content: [{ type: "text", text }] };
@@ -1477,9 +1501,10 @@ function createMcpServer() {
     "dns_propagation",
     "Check if DNS has propagated by querying 8 public resolvers worldwide (Google, Cloudflare, OpenDNS, Quad9, etc.).",
     {
-      domain: z.string().describe("Domain to check"),
+      domain: z.string().describe("Domain to check (e.g. example.com)"),
       record_type: z.string().default("A").describe("Record type to check (default A)"),
     },
+    { title: "DNS Propagation Check", readOnlyHint: true, openWorldHint: true },
     async ({ domain, record_type }) => {
       const text = await dnsPropagation(domain, record_type);
       return { content: [{ type: "text", text }] };
@@ -1490,7 +1515,8 @@ function createMcpServer() {
   server.tool(
     "subdomain_finder",
     "Discover common subdomains for a domain by checking ~80 common subdomain prefixes.",
-    { domain: z.string().describe("Domain to scan for subdomains") },
+    { domain: z.string().describe("Domain to scan for subdomains (e.g. example.com)") },
+    { title: "Subdomain Finder", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await subdomainFinder(domain);
       return { content: [{ type: "text", text }] };
@@ -1501,7 +1527,8 @@ function createMcpServer() {
   server.tool(
     "http_headers_check",
     "Audit HTTP security headers (HSTS, CSP, X-Frame-Options, etc.) and give a letter grade A–F.",
-    { domain: z.string().describe("Domain or URL to check") },
+    { domain: z.string().describe("Domain or URL to check (e.g. example.com)") },
+    { title: "HTTP Security Headers", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await httpHeadersCheck(domain);
       return { content: [{ type: "text", text }] };
@@ -1516,6 +1543,7 @@ function createMcpServer() {
       url: z.string().describe("URL to trace (e.g. http://example.com)"),
       max_redirects: z.number().default(10).describe("Maximum redirects to follow (default 10)"),
     },
+    { title: "Redirect Chain Tracer", readOnlyHint: true, openWorldHint: true },
     async ({ url, max_redirects }) => {
       const text = await redirectChain(url, max_redirects);
       return { content: [{ type: "text", text }] };
@@ -1526,7 +1554,8 @@ function createMcpServer() {
   server.tool(
     "tech_stack_detect",
     "Detect the technology stack of a website: web server, CDN, framework, CMS, analytics, and more.",
-    { domain: z.string().describe("Domain to analyze") },
+    { domain: z.string().describe("Domain to analyze (e.g. example.com)") },
+    { title: "Tech Stack Detector", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await techStackDetect(domain);
       return { content: [{ type: "text", text }] };
@@ -1537,7 +1566,8 @@ function createMcpServer() {
   server.tool(
     "domain_age",
     "Calculate the exact age of a domain and show its registration timeline.",
-    { domain: z.string().describe("Domain to check age of") },
+    { domain: z.string().describe("Domain to check age of (e.g. example.com)") },
+    { title: "Domain Age Calculator", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
       const text = await domainAge(domain);
       return { content: [{ type: "text", text }] };
@@ -1549,9 +1579,10 @@ function createMcpServer() {
     "dns_compare",
     "Compare DNS records of two domains side by side. Useful for comparing setups or verifying migration.",
     {
-      domain1: z.string().describe("First domain"),
-      domain2: z.string().describe("Second domain"),
+      domain1: z.string().describe("First domain (e.g. google.com)"),
+      domain2: z.string().describe("Second domain (e.g. bing.com)"),
     },
+    { title: "DNS Comparison", readOnlyHint: true, openWorldHint: true },
     async ({ domain1, domain2 }) => {
       const text = await dnsCompare(domain1, domain2);
       return { content: [{ type: "text", text }] };
@@ -1563,14 +1594,17 @@ function createMcpServer() {
     "port_check",
     "Check if common network ports are open on a domain. Useful for verifying services are running.",
     {
-      domain: z.string().describe("Domain or IP to scan"),
+      domain: z.string().describe("Domain or IP to scan (e.g. example.com)"),
       ports: z.string().default("common").describe("Comma-separated port numbers or 'common' for standard web/mail/ssh ports"),
     },
+    { title: "Port Scanner", readOnlyHint: true, openWorldHint: true },
     async ({ domain, ports }) => {
       const text = await portCheck(domain, ports);
       return { content: [{ type: "text", text }] };
     }
   );
+
+  // ─── Prompts ────────────────────────────────────────────────────────────────
 
   // --- domain-check prompt ---
   server.prompt(
@@ -1587,6 +1621,90 @@ function createMcpServer() {
     })
   );
 
+  // --- security-audit prompt ---
+  server.prompt(
+    "security-audit",
+    "Audit the security posture of a domain",
+    { domain: z.string().describe("Domain to audit") },
+    ({ domain }) => ({
+      messages: [
+        {
+          role: "user",
+          content: { type: "text", text: `Perform a security audit on ${domain}. Use these tools in order:\n1. ssl_check — verify the certificate is valid and not expiring soon\n2. http_headers_check — grade the security headers\n3. email_config_check — check SPF, DKIM, DMARC\n4. port_check — scan for open ports\n\nSummarize the findings with an overall security rating and actionable recommendations.` },
+        },
+      ],
+    })
+  );
+
+  // --- compare-domains prompt ---
+  server.prompt(
+    "compare-domains",
+    "Compare two domains side by side",
+    {
+      domain1: z.string().describe("First domain"),
+      domain2: z.string().describe("Second domain"),
+    },
+    ({ domain1, domain2 }) => ({
+      messages: [
+        {
+          role: "user",
+          content: { type: "text", text: `Compare ${domain1} and ${domain2} using dns_compare, then run ssl_check and http_headers_check on both. Present a side-by-side comparison highlighting key differences in DNS configuration, SSL certificates, and security headers.` },
+        },
+      ],
+    })
+  );
+
+  // --- find-subdomains prompt ---
+  server.prompt(
+    "find-subdomains",
+    "Discover and analyze subdomains of a domain",
+    { domain: z.string().describe("Domain to scan") },
+    ({ domain }) => ({
+      messages: [
+        {
+          role: "user",
+          content: { type: "text", text: `Find all subdomains of ${domain} using subdomain_finder. For each discovered subdomain, briefly note what it likely serves (mail, API, CDN, etc.) based on its name and IP. Summarize the domain's infrastructure footprint.` },
+        },
+      ],
+    })
+  );
+
+  // ─── Resources ──────────────────────────────────────────────────────────────
+
+  // --- tool catalog resource ---
+  server.resource(
+    "tool-catalog",
+    "info://tools",
+    { title: "Tool Catalog", description: "Complete list of all 15 domain intelligence tools with descriptions and parameters", mimeType: "application/json" },
+    async (uri) => ({
+      contents: [{
+        uri: uri.href,
+        text: JSON.stringify(SERVER_CARD.tools, null, 2),
+      }],
+    })
+  );
+
+  // --- server info resource ---
+  server.resource(
+    "server-info",
+    "info://server",
+    { title: "Server Information", description: "MCP Domain Lookup server metadata, version, and capabilities", mimeType: "application/json" },
+    async (uri) => ({
+      contents: [{
+        uri: uri.href,
+        text: JSON.stringify({
+          name: SERVER_CARD.name,
+          displayName: "Domain Inspector",
+          version: SERVER_CARD.version,
+          description: SERVER_CARD.description,
+          toolCount: SERVER_CARD.tools.length,
+          homepage: "https://mcpdns.onrender.com",
+          repository: "https://github.com/DynamycSound/mcpdns",
+        }, null, 2),
+      }],
+    })
+  );
+
   return server;
 }
 
@@ -1594,78 +1712,156 @@ function createMcpServer() {
 // About page HTML
 // ---------------------------------------------------------------------------
 
-const ABOUT_HTML = `<!DOCTYPE html>
+const HOMEPAGE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MCP Domain Lookup</title>
+<title>Domain Inspector — MCP Domain Intelligence Server</title>
+<meta name="description" content="15 domain intelligence tools for AI agents. DNS, WHOIS, SSL, email security, tech stack detection, and more via the Model Context Protocol.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui,-apple-system,sans-serif;background:#fff;color:#1a1a1a;line-height:1.7}
-.w{max-width:720px;margin:0 auto;padding:3rem 1.5rem}
-h1{font-size:1.6rem;font-weight:700;margin-bottom:.25rem}
-.tag{display:inline-block;font-size:.75rem;background:#f0fdf4;color:#166534;padding:2px 10px;border-radius:99px;font-weight:500;margin-bottom:1.5rem}
-p.desc{color:#555;font-size:1rem;margin-bottom:2rem}
-h2{font-size:1.1rem;font-weight:600;margin:2rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid #eee}
-.tools{display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem}
-.t{font-size:.9rem;padding:.3rem 0}
-.t code{background:#f5f5f5;padding:1px 6px;border-radius:4px;font-size:.82rem;font-weight:500}
-.t span{color:#666}
-.usage{background:#fafafa;border:1px solid #eee;border-radius:8px;padding:1.25rem;margin:1rem 0}
-.usage p{margin:.25rem 0;font-size:.9rem;color:#444}
-.usage strong{color:#1a1a1a}
-.connect{margin:2rem 0}
-.connect code{display:block;background:#1a1a1a;color:#e2e8f0;padding:1rem;border-radius:8px;font-size:.85rem;overflow-x:auto;white-space:pre}
-footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid #eee;font-size:.8rem;color:#999}
-a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
-@media(max-width:600px){.tools{grid-template-columns:1fr}}
+:root{--bg:#0a0a0f;--surface:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);--glass:rgba(255,255,255,.06);--text:#e4e4e7;--muted:#71717a;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--radius:16px}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;min-height:100vh}
+body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse at 30% 20%,rgba(99,102,241,.08) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(34,197,94,.05) 0%,transparent 50%);pointer-events:none;z-index:0}
+.wrap{max-width:900px;margin:0 auto;padding:2rem 1.5rem;position:relative;z-index:1}
+header{text-align:center;padding:4rem 0 3rem}
+.logo{display:inline-flex;align-items:center;gap:.75rem;margin-bottom:1.5rem}
+.logo svg{width:48px;height:48px}
+.logo-text{font-size:1.75rem;font-weight:700;letter-spacing:-.02em}
+.badge{display:inline-flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-bottom:1.5rem}
+.badge span{font-size:.75rem;padding:4px 12px;border-radius:99px;border:1px solid var(--border);color:var(--muted);background:var(--surface)}
+.badge .live{color:var(--green);border-color:rgba(34,197,94,.3)}
+p.hero{color:var(--muted);font-size:1.05rem;max-width:600px;margin:0 auto 2rem;line-height:1.8}
+.glass{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:2rem;margin-bottom:2rem}
+h2{font-size:1.15rem;font-weight:600;margin-bottom:1.25rem;color:#fff;display:flex;align-items:center;gap:.5rem}
+h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.tools-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+.tool{padding:.6rem .8rem;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid transparent;transition:border-color .2s}
+.tool:hover{border-color:var(--border)}
+.tool code{font-size:.8rem;font-weight:600;color:var(--accent2);display:block;margin-bottom:2px}
+.tool span{font-size:.75rem;color:var(--muted)}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem}
+.feat{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;text-align:center}
+.feat .num{font-size:2rem;font-weight:700;color:var(--accent2);display:block;margin-bottom:.25rem}
+.feat .label{font-size:.85rem;color:var(--muted)}
+pre.code-block{background:rgba(0,0,0,.5);border:1px solid var(--border);border-radius:12px;padding:1.25rem;overflow-x:auto;font-size:.85rem;color:#a5b4fc;line-height:1.6;margin:1rem 0}
+.faq{margin-top:.5rem}
+.faq details{border-bottom:1px solid var(--border);padding:1rem 0}
+.faq details:last-child{border-bottom:none}
+.faq summary{cursor:pointer;font-weight:500;font-size:.95rem;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.faq summary::after{content:'+';font-size:1.2rem;color:var(--muted);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq .answer{padding-top:.75rem;font-size:.9rem;color:var(--muted);line-height:1.7}
+.clients{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem}
+.clients span{font-size:.8rem;padding:6px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+footer{text-align:center;padding:3rem 0 2rem;font-size:.8rem;color:var(--muted);border-top:1px solid var(--border);margin-top:2rem}
+footer a{color:var(--accent2);text-decoration:none}
+footer a:hover{text-decoration:underline}
+@media(max-width:700px){.tools-grid{grid-template-columns:repeat(2,1fr)}.features{grid-template-columns:1fr}}
+@media(max-width:480px){.tools-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="w">
-<h1>MCP Domain Lookup</h1>
-<span class="tag">v2.0.0 &middot; 15 tools &middot; MCP Server</span>
-<p class="desc">Domain intelligence for AI agents. DNS records, WHOIS, SSL certificates, email security, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more &mdash; all through the Model Context Protocol.</p>
+<div class="wrap">
+<header>
+<div class="logo">
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity=".3"/><circle cx="24" cy="24" r="15" stroke="#818cf8" stroke-width="2"/><circle cx="24" cy="24" r="4" fill="#818cf8"/><line x1="24" y1="2" x2="24" y2="46" stroke="#6366f1" stroke-width="1" opacity=".3"/><ellipse cx="24" cy="24" rx="10" ry="22" stroke="#6366f1" stroke-width="1" opacity=".3"/></svg>
+<span class="logo-text">Domain Inspector</span>
+</div>
+<div class="badge">
+<span class="live">Live</span>
+<span>v2.0.0</span>
+<span>15 Tools</span>
+<span>MCP Server</span>
+<span>Free &amp; Open Source</span>
+</div>
+<p class="hero">Domain intelligence for AI agents. DNS records, WHOIS, SSL certificates, email security, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more &mdash; all through the Model Context Protocol.</p>
+</header>
 
-<h2>Tools</h2>
-<div class="tools">
-<div class="t"><code>domain_report</code> <span>Full intelligence report</span></div>
-<div class="t"><code>dns_lookup</code> <span>A/AAAA/MX/TXT/NS/CNAME</span></div>
-<div class="t"><code>whois_lookup</code> <span>Registration &amp; expiry</span></div>
-<div class="t"><code>domain_available</code> <span>Availability check</span></div>
-<div class="t"><code>email_config_check</code> <span>SPF/DKIM/DMARC audit</span></div>
-<div class="t"><code>ssl_check</code> <span>Certificate details</span></div>
-<div class="t"><code>reverse_dns</code> <span>IP to hostname</span></div>
-<div class="t"><code>dns_propagation</code> <span>8 global resolvers</span></div>
-<div class="t"><code>subdomain_finder</code> <span>~80 common prefixes</span></div>
-<div class="t"><code>http_headers_check</code> <span>Security grade A&ndash;F</span></div>
-<div class="t"><code>redirect_chain</code> <span>Full redirect path</span></div>
-<div class="t"><code>tech_stack_detect</code> <span>Server/CDN/framework</span></div>
-<div class="t"><code>domain_age</code> <span>Exact age &amp; timeline</span></div>
-<div class="t"><code>dns_compare</code> <span>Side-by-side comparison</span></div>
-<div class="t"><code>port_check</code> <span>Common port scan</span></div>
+<div class="features">
+<div class="feat"><span class="num">15</span><span class="label">Intelligence Tools</span></div>
+<div class="feat"><span class="num">4</span><span class="label">Prompt Templates</span></div>
+<div class="feat"><span class="num">&lt;3s</span><span class="label">Avg Response</span></div>
 </div>
 
-<h2>Connect</h2>
-<p style="font-size:.9rem;color:#555;margin-bottom:.75rem">Add to your MCP client (Cursor, Claude, Windsurf, VS Code, etc.):</p>
-<code>{
+<div class="glass">
+<h2><span class="dot"></span>Tools</h2>
+<div class="tools-grid">
+<div class="tool"><code>domain_report</code><span>Full intelligence report</span></div>
+<div class="tool"><code>dns_lookup</code><span>A/AAAA/MX/TXT/NS/CNAME</span></div>
+<div class="tool"><code>whois_lookup</code><span>Registration &amp; expiry</span></div>
+<div class="tool"><code>domain_available</code><span>Availability check</span></div>
+<div class="tool"><code>email_config_check</code><span>SPF/DKIM/DMARC audit</span></div>
+<div class="tool"><code>ssl_check</code><span>Certificate details</span></div>
+<div class="tool"><code>reverse_dns</code><span>IP to hostname</span></div>
+<div class="tool"><code>dns_propagation</code><span>8 global resolvers</span></div>
+<div class="tool"><code>subdomain_finder</code><span>~80 common prefixes</span></div>
+<div class="tool"><code>http_headers_check</code><span>Security grade A&ndash;F</span></div>
+<div class="tool"><code>redirect_chain</code><span>Full redirect path</span></div>
+<div class="tool"><code>tech_stack_detect</code><span>Server/CDN/framework</span></div>
+<div class="tool"><code>domain_age</code><span>Exact age &amp; timeline</span></div>
+<div class="tool"><code>dns_compare</code><span>Side-by-side comparison</span></div>
+<div class="tool"><code>port_check</code><span>Common port scan</span></div>
+</div>
+</div>
+
+<div class="glass">
+<h2><span class="dot"></span>Connect</h2>
+<p style="font-size:.9rem;color:var(--muted);margin-bottom:.75rem">Add to your MCP client configuration:</p>
+<pre class="code-block">{
   "mcpServers": {
     "domain-lookup": {
-      "url": "https://YOUR_DEPLOYED_URL/mcp"
+      "url": "https://mcpdns.onrender.com/mcp"
     }
   }
-}</code>
-
-<h2>Quick Start</h2>
-<p style="font-size:.9rem;color:#555">Just ask your AI assistant:</p>
-<div class="usage">
-<p>&ldquo;Run a domain report for stripe.com&rdquo;</p>
-<p>&ldquo;Check the SSL certificate for github.com&rdquo;</p>
-<p>&ldquo;Find subdomains of google.com&rdquo;</p>
-<p>&ldquo;Compare DNS records of google.com and bing.com&rdquo;</p>
+}</pre>
+<p style="font-size:.85rem;color:var(--muted);margin-top:.75rem">Compatible with:</p>
+<div class="clients">
+<span>Claude Desktop</span>
+<span>Cursor</span>
+<span>Windsurf</span>
+<span>VS Code</span>
+<span>Cline</span>
+<span>Any MCP Client</span>
+</div>
 </div>
 
-<footer>MCP Domain Lookup &middot; <a href="https://github.com/anthropics/model-context-protocol">Model Context Protocol</a> &middot; MIT License</footer>
+<div class="glass">
+<h2><span class="dot"></span>Quick Start</h2>
+<p style="font-size:.9rem;color:var(--muted);margin-bottom:.75rem">Once connected, just ask your AI assistant:</p>
+<pre class="code-block">"Run a domain report for stripe.com"
+"Check the SSL certificate for github.com"
+"Audit the security of my-company.com"
+"Find subdomains of google.com"
+"Compare DNS records of google.com and bing.com"</pre>
+</div>
+
+<div class="glass">
+<h2><span class="dot"></span>Frequently Asked Questions</h2>
+<div class="faq">
+<details><summary>What is this?<span></span></summary><div class="answer">Domain Inspector is an MCP (Model Context Protocol) server that gives AI assistants the ability to perform domain intelligence lookups. It provides 15 tools covering DNS, WHOIS, SSL, email security, HTTP headers, tech stack detection, subdomain discovery, and port scanning.</div></details>
+<details><summary>How do I use it?<span></span></summary><div class="answer">Add the server URL to your MCP client configuration (Claude Desktop, Cursor, Windsurf, VS Code, etc.), then ask your AI assistant to analyze any domain. The assistant will automatically use the appropriate tools.</div></details>
+<details><summary>Is it free?<span></span></summary><div class="answer">Yes. Domain Inspector is completely free and open source under the MIT license. There are no API keys, rate limits, or paid tiers.</div></details>
+<details><summary>What data sources does it use?<span></span></summary><div class="answer">All data comes from public sources: DNS protocol queries, public WHOIS registries, SSL/TLS certificate inspection, HTTP response headers, and standard network protocols. No private databases or paid APIs are used.</div></details>
+<details><summary>Is it safe to use?<span></span></summary><div class="answer">Yes. All tools are read-only and only query publicly available data. DNS lookups, WHOIS queries, and SSL checks are standard operations that every web browser performs. Subdomain scanning and port checking use conservative limits and timeouts.</div></details>
+<details><summary>What is MCP?<span></span></summary><div class="answer">The Model Context Protocol (MCP) is an open standard by Anthropic that allows AI assistants to connect to external tools and data sources. It enables AI models to take actions and access real-time information through a standardized interface.</div></details>
+<details><summary>Can I self-host it?<span></span></summary><div class="answer">Yes. Clone the repository, run <code>npm install</code>, then <code>node server.js</code>. The server runs on port 3000 by default. You can deploy it to any Node.js hosting provider (Render, Railway, Fly.io, etc.).</div></details>
+</div>
+</div>
+
+<div class="glass">
+<h2><span class="dot"></span>API Endpoints</h2>
+<div class="tools-grid" style="grid-template-columns:1fr 1fr">
+<div class="tool"><code>POST /mcp</code><span>MCP JSON-RPC endpoint</span></div>
+<div class="tool"><code>GET /health</code><span>Health check</span></div>
+<div class="tool"><code>GET /.well-known/mcp/server-card.json</code><span>Server metadata</span></div>
+<div class="tool"><code>GET /</code><span>Server info (JSON)</span></div>
+</div>
+</div>
+
+<footer>
+Domain Inspector &middot; <a href="https://github.com/DynamycSound/mcpdns">GitHub</a> &middot; <a href="https://modelcontextprotocol.io">MCP Protocol</a> &middot; MIT License
+</footer>
 </div>
 </body>
 </html>`;
@@ -1765,21 +1961,36 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", tools: SERVER_CARD.tools.length, version: SERVER_CARD.version });
 });
 
-// --- About page ---
-app.get("/about", (_req, res) => {
-  res.type("html").send(ABOUT_HTML);
+// --- SVG icon ---
+const ICON_SVG = `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity=".3"/><circle cx="24" cy="24" r="15" stroke="#818cf8" stroke-width="2"/><circle cx="24" cy="24" r="4" fill="#818cf8"/><line x1="24" y1="2" x2="24" y2="46" stroke="#6366f1" stroke-width="1" opacity=".3"/><ellipse cx="24" cy="24" rx="10" ry="22" stroke="#6366f1" stroke-width="1" opacity=".3"/></svg>`;
+app.get("/icon.svg", (_req, res) => {
+  res.type("image/svg+xml").send(ICON_SVG);
 });
 
-// --- Root info ---
-app.get("/", (_req, res) => {
+// --- Homepage ---
+app.get("/about", (_req, res) => {
+  res.type("html").send(HOMEPAGE_HTML);
+});
+
+// --- Root — serve homepage for browsers, JSON for API clients ---
+app.get("/", (req, res) => {
+  const accept = req.headers.accept || "";
+  if (accept.includes("text/html")) {
+    res.type("html").send(HOMEPAGE_HTML);
+    return;
+  }
   res.json({
     name: "mcp-domain-lookup",
+    displayName: "Domain Inspector",
     version: SERVER_CARD.version,
     description: SERVER_CARD.description,
+    homepage: "https://mcpdns.onrender.com",
+    repository: "https://github.com/DynamycSound/mcpdns",
     endpoints: {
       mcp: "/mcp",
       health: "/health",
-      about: "/about",
+      homepage: "/about",
+      icon: "/icon.svg",
       serverCard: "/.well-known/mcp/server-card.json",
     },
     toolCount: SERVER_CARD.tools.length,
