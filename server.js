@@ -1306,19 +1306,17 @@ const SERVER_CARD = {
   version: "2.0.0",
   homepage: "https://mcpdns.onrender.com",
   icons: [{ src: "https://mcpdns.onrender.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] }],
-  config: {
-    schema: {
-      type: "object",
-      properties: {
-        timeout: {
-          type: "number",
-          title: "Request Timeout (ms)",
-          description: "Maximum time in milliseconds for each tool request. Default is 30000 (30 seconds).",
-          default: 30000,
-        },
+  configSchema: {
+    type: "object",
+    properties: {
+      timeout: {
+        type: "number",
+        title: "Request Timeout (ms)",
+        description: "Maximum time in milliseconds for each tool request. Default is 30000 (30 seconds).",
+        default: 30000,
       },
-      required: [],
     },
+    required: [],
   },
   tools: [
     {
