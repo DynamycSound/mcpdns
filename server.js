@@ -1612,13 +1612,13 @@ function createMcpServer() {
   // --- domain-check prompt ---
   server.prompt(
     "domain-check",
-    "Run a full domain intelligence report",
+    "Run a full domain intelligence report with analysis and recommendations",
     { domain: z.string().describe("Domain to analyze") },
     ({ domain }) => ({
       messages: [
         {
           role: "user",
-          content: { type: "text", text: `Run a complete domain report for ${domain} using the domain_report tool. Show me everything: DNS records, WHOIS data, email security, SSL certificate, HTTP security headers, tech stack, and domain age.` },
+          content: { type: "text", text: `Run a complete domain report for ${domain} using the domain_report tool. After getting the results, provide a brief executive summary covering:\n- Overall health assessment (DNS, SSL, email security)\n- Any urgent issues (expiring certificates, missing security headers, exposed ports)\n- Key recommendations ranked by priority\n- Notable findings about the domain's infrastructure` },
         },
       ],
     })
@@ -1717,6 +1717,8 @@ function createMcpServer() {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const HOMEPAGE_HTML = fs.readFileSync(path.join(__dirname, "homepage.html"), "utf-8");
+const TERMS_HTML = fs.readFileSync(path.join(__dirname, "terms.html"), "utf-8");
+const PRIVACY_HTML = fs.readFileSync(path.join(__dirname, "privacy.html"), "utf-8");
 
 // ---------------------------------------------------------------------------
 // Express app & transport wiring
@@ -1822,6 +1824,14 @@ app.get("/icon.svg", (_req, res) => {
 // --- Homepage ---
 app.get("/about", (_req, res) => {
   res.type("html").send(HOMEPAGE_HTML);
+});
+
+// --- Legal pages ---
+app.get("/terms", (_req, res) => {
+  res.type("html").send(TERMS_HTML);
+});
+app.get("/privacy", (_req, res) => {
+  res.type("html").send(PRIVACY_HTML);
 });
 
 // --- Root — serve homepage for browsers, JSON for API clients ---

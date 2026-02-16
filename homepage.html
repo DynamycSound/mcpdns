@@ -1,231 +1,601 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Domain Inspector — MCP Domain Intelligence Server</title>
-<meta name="description" content="15 domain intelligence tools for AI agents. DNS, WHOIS, SSL, email security, tech stack detection, and more via the Model Context Protocol.">
-<link rel="icon" href="/icon.svg" type="image/svg+xml">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#09090b;--surface:#111113;--surface2:#18181b;--border:#27272a;--border2:#3f3f46;--text:#fafafa;--text2:#a1a1aa;--text3:#71717a;--accent:#6366f1;--accent2:#818cf8;--accentBg:rgba(99,102,241,.08);--green:#22c55e;--red:#ef4444;--yellow:#eab308;--radius:12px;--maxW:1200px;--sidebar:260px}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Domain Inspector — MCP Domain Intelligence Server</title>
+  <meta name="description"
+    content="15 domain intelligence tools for AI agents. DNS, WHOIS, SSL, email security, tech stack detection, and more via the Model Context Protocol.">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
 
-/* ── Navbar ── */
-.navbar{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(9,9,11,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border);z-index:100;display:flex;align-items:center;padding:0 24px}
-.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:600;font-size:15px}
-.nav-logo svg{width:28px;height:28px}
-.nav-links{display:flex;gap:4px;margin-left:auto}
-.nav-links a{color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;padding:6px 12px;border-radius:6px;transition:color .15s,background .15s}
-.nav-links a:hover{color:var(--text);background:var(--surface2)}
-.nav-version{font-size:11px;color:var(--text3);border:1px solid var(--border);padding:2px 8px;border-radius:99px;margin-left:12px}
+    :root {
+      --bg: #09090b;
+      --surface: #111113;
+      --surface2: #18181b;
+      --border: #27272a;
+      --border2: #3f3f46;
+      --text: #fafafa;
+      --text2: #a1a1aa;
+      --text3: #71717a;
+      --accent: #6366f1;
+      --accent2: #818cf8;
+      --accentBg: rgba(99, 102, 241, .08);
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --radius: 12px;
+      --maxW: 1200px;
+      --sidebar: 260px
+    }
 
-/* ── Layout ── */
-.page{display:flex;margin-top:56px;min-height:calc(100vh - 56px)}
-.sidebar{width:var(--sidebar);position:fixed;top:56px;left:0;bottom:0;overflow-y:auto;padding:20px 16px;border-right:1px solid var(--border);background:var(--bg)}
-.sidebar::-webkit-scrollbar{width:4px}
-.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-.sidebar h4{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin:16px 0 8px;padding:0 8px}
-.sidebar h4:first-child{margin-top:0}
-.sidebar a{display:block;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 8px;border-radius:6px;margin-bottom:1px;transition:color .15s,background .15s}
-.sidebar a:hover{color:var(--text);background:var(--surface2)}
-.sidebar a.active{color:var(--accent2);background:var(--accentBg)}
-.main{margin-left:var(--sidebar);flex:1;padding:40px 48px 80px;max-width:calc(var(--maxW) - var(--sidebar))}
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased
+    }
 
-/* ── Hero ── */
-.hero{margin-bottom:48px}
-.hero h1{font-size:32px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
-.hero h1 span{color:var(--accent2)}
-.hero p{font-size:16px;color:var(--text2);max-width:640px;line-height:1.7}
-.hero-badges{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
-.hero-badges span{font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);color:var(--text3)}
-.hero-badges .live{color:var(--green);border-color:rgba(34,197,94,.3)}
+    /* ── Navbar ── */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: rgba(9, 9, 11, .85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      padding: 0 24px
+    }
 
-/* ── Stats ── */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:48px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center}
-.stat .val{font-size:28px;font-weight:700;color:var(--accent2);display:block}
-.stat .label{font-size:13px;color:var(--text3);margin-top:2px}
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 15px
+    }
 
-/* ── Sections ── */
-.section{margin-bottom:48px;scroll-margin-top:72px}
-.section h2{font-size:20px;font-weight:600;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
-.section h3{font-size:16px;font-weight:600;margin-bottom:8px;scroll-margin-top:72px}
-.section p{font-size:14px;color:var(--text2);margin-bottom:12px;line-height:1.7}
+    .nav-logo svg {
+      width: 28px;
+      height: 28px
+    }
 
-/* ── Tool Cards ── */
-.tool-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;scroll-margin-top:72px}
-.tool-header{padding:20px 24px 16px;border-bottom:1px solid var(--border)}
-.tool-name{font-size:15px;font-weight:600;color:var(--accent2);font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;margin-bottom:4px}
-.tool-desc{font-size:13px;color:var(--text2);line-height:1.6}
-.tool-params{padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface2)}
-.tool-params h4{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px}
-.param{display:flex;gap:8px;align-items:baseline;margin-bottom:4px;font-size:13px}
-.param code{color:var(--accent2);font-weight:600;font-size:12px;background:var(--accentBg);padding:1px 6px;border-radius:4px}
-.param .type{color:var(--text3);font-size:12px}
-.param .pdesc{color:var(--text2)}
-.param .req{color:var(--yellow);font-size:11px;font-weight:600}
-.param .opt{color:var(--text3);font-size:11px}
-.tool-example{padding:0}
-.tool-example summary{padding:14px 24px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;transition:color .15s}
-.tool-example summary:hover{color:var(--text)}
-.tool-example summary::before{content:'';display:inline-block;width:0;height:0;border-left:5px solid var(--text3);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
-.tool-example[open] summary::before{transform:rotate(90deg)}
-.tool-example pre{margin:0;padding:16px 24px 20px;background:rgba(0,0,0,.3);font-size:12px;line-height:1.6;color:var(--text2);overflow-x:auto;white-space:pre;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;border-top:1px solid var(--border)}
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      margin-left: auto
+    }
 
-/* ── Code blocks ── */
-pre.code{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;font-size:13px;line-height:1.6;color:var(--accent2);overflow-x:auto;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;margin-bottom:16px}
+    .nav-links a {
+      color: var(--text2);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: color .15s, background .15s
+    }
 
-/* ── FAQ ── */
-.faq details{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;background:var(--surface)}
-.faq summary{padding:14px 20px;font-size:14px;font-weight:500;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
-.faq summary::after{content:'+';font-size:18px;color:var(--text3);font-weight:300;transition:transform .2s}
-.faq details[open] summary::after{transform:rotate(45deg)}
-.faq .answer{padding:0 20px 16px;font-size:13px;color:var(--text2);line-height:1.7}
+    .nav-links a:hover {
+      color: var(--text);
+      background: var(--surface2)
+    }
 
-/* ── Clients ── */
-.client-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-.client{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--text2)}
-.client strong{color:var(--text);font-weight:500;display:block;margin-bottom:2px}
+    /* ── Layout ── */
+    .page {
+      display: flex;
+      margin-top: 56px;
+      min-height: calc(100vh - 56px)
+    }
 
-/* ── Footer ── */
-footer{margin-left:var(--sidebar);padding:24px 48px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);display:flex;justify-content:space-between}
-footer a{color:var(--accent2);text-decoration:none}
-footer a:hover{text-decoration:underline}
+    .sidebar {
+      width: var(--sidebar);
+      position: fixed;
+      top: 56px;
+      left: 0;
+      bottom: 0;
+      overflow-y: auto;
+      padding: 20px 16px;
+      border-right: 1px solid var(--border);
+      background: var(--bg)
+    }
 
-/* ── Mobile ── */
-@media(max-width:900px){
-  .sidebar{display:none}
-  .main{margin-left:0;padding:24px 20px 60px}
-  footer{margin-left:0;padding:24px 20px;flex-direction:column;gap:8px}
-  .stats{grid-template-columns:repeat(2,1fr)}
-  .client-grid{grid-template-columns:1fr}
-}
-@media(max-width:480px){
-  .stats{grid-template-columns:1fr 1fr}
-  .hero h1{font-size:24px}
-}
-</style>
+    .sidebar::-webkit-scrollbar {
+      width: 4px
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px
+    }
+
+    .sidebar h4 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text3);
+      margin: 16px 0 8px;
+      padding: 0 8px
+    }
+
+    .sidebar h4:first-child {
+      margin-top: 0
+    }
+
+    .sidebar a {
+      display: block;
+      font-size: 13px;
+      color: var(--text2);
+      text-decoration: none;
+      padding: 5px 8px;
+      border-radius: 6px;
+      margin-bottom: 1px;
+      transition: color .15s, background .15s
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: var(--surface2)
+    }
+
+    .sidebar a.active {
+      color: var(--accent2);
+      background: var(--accentBg)
+    }
+
+    .main {
+      margin-left: var(--sidebar);
+      flex: 1;
+      padding: 40px 48px 80px;
+      max-width: calc(var(--maxW) - var(--sidebar))
+    }
+
+    /* ── Hero ── */
+    .hero {
+      margin-bottom: 48px
+    }
+
+    .hero h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      margin-bottom: 8px
+    }
+
+    .hero h1 span {
+      color: var(--accent2)
+    }
+
+    .hero p {
+      font-size: 16px;
+      color: var(--text2);
+      max-width: 640px;
+      line-height: 1.7
+    }
+
+    /* ── Sections ── */
+    .section {
+      margin-bottom: 48px;
+      scroll-margin-top: 72px
+    }
+
+    .section h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .section h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      scroll-margin-top: 72px
+    }
+
+    .section p {
+      font-size: 14px;
+      color: var(--text2);
+      margin-bottom: 12px;
+      line-height: 1.7
+    }
+
+    /* ── Tool Cards ── */
+    .tool-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+      scroll-margin-top: 72px
+    }
+
+    .tool-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .tool-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent2);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      margin-bottom: 4px
+    }
+
+    .tool-desc {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6
+    }
+
+    .tool-params {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2)
+    }
+
+    .tool-params h4 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text3);
+      margin-bottom: 8px
+    }
+
+    .param {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 4px;
+      font-size: 13px
+    }
+
+    .param code {
+      color: var(--accent2);
+      font-weight: 600;
+      font-size: 12px;
+      background: var(--accentBg);
+      padding: 1px 6px;
+      border-radius: 4px
+    }
+
+    .param .type {
+      color: var(--text3);
+      font-size: 12px
+    }
+
+    .param .pdesc {
+      color: var(--text2)
+    }
+
+    .param .req {
+      color: var(--yellow);
+      font-size: 11px;
+      font-weight: 600
+    }
+
+    .param .opt {
+      color: var(--text3);
+      font-size: 11px
+    }
+
+    .tool-example {
+      padding: 0
+    }
+
+    .tool-example summary {
+      padding: 14px 24px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color .15s
+    }
+
+    .tool-example summary:hover {
+      color: var(--text)
+    }
+
+    .tool-example summary::before {
+      content: '';
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-left: 5px solid var(--text3);
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      transition: transform .15s
+    }
+
+    .tool-example[open] summary::before {
+      transform: rotate(90deg)
+    }
+
+    .tool-example pre {
+      margin: 0;
+      padding: 16px 24px 20px;
+      background: rgba(0, 0, 0, .3);
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text2);
+      overflow-x: auto;
+      white-space: pre;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      border-top: 1px solid var(--border)
+    }
+
+    /* ── Code blocks ── */
+    pre.code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--accent2);
+      overflow-x: auto;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      margin-bottom: 16px
+    }
+
+    /* ── FAQ ── */
+    .faq details {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      background: var(--surface)
+    }
+
+    .faq summary {
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center
+    }
+
+    .faq summary::after {
+      content: '+';
+      font-size: 18px;
+      color: var(--text3);
+      font-weight: 300;
+      transition: transform .2s
+    }
+
+    .faq details[open] summary::after {
+      transform: rotate(45deg)
+    }
+
+    .faq .answer {
+      padding: 0 20px 16px;
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.7
+    }
+
+    /* ── Clients ── */
+    .client-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px
+    }
+
+    .client {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--text2)
+    }
+
+    .client strong {
+      color: var(--text);
+      font-weight: 500;
+      display: block;
+      margin-bottom: 2px
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-left: var(--sidebar);
+      padding: 24px 48px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text3);
+      display: flex;
+      justify-content: space-between
+    }
+
+    footer a {
+      color: var(--accent2);
+      text-decoration: none
+    }
+
+    footer a:hover {
+      text-decoration: underline
+    }
+
+    /* ── Mobile ── */
+    @media(max-width:900px) {
+      .sidebar {
+        display: none
+      }
+
+      .main {
+        margin-left: 0;
+        padding: 24px 20px 60px
+      }
+
+      footer {
+        margin-left: 0;
+        padding: 24px 20px;
+        flex-direction: column;
+        gap: 8px
+      }
+
+      .client-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    @media(max-width:480px) {
+      .hero h1 {
+        font-size: 24px
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<!-- ── Navbar ── -->
-<nav class="navbar">
-  <a href="#" class="nav-logo">
-    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity=".3"/><circle cx="24" cy="24" r="15" stroke="#818cf8" stroke-width="2"/><circle cx="24" cy="24" r="4" fill="#818cf8"/><line x1="24" y1="2" x2="24" y2="46" stroke="#6366f1" stroke-width="1" opacity=".3"/><ellipse cx="24" cy="24" rx="10" ry="22" stroke="#6366f1" stroke-width="1" opacity=".3"/></svg>
-    Domain Inspector
-  </a>
-  <span class="nav-version">v2.0.0</span>
-  <div class="nav-links">
-    <a href="#overview">Overview</a>
-    <a href="#tools">Tools</a>
-    <a href="#connect">Connect</a>
-    <a href="#faq">FAQ</a>
-  </div>
-</nav>
+  <!-- ── Navbar ── -->
+  <nav class="navbar">
+    <a href="#" class="nav-logo">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity=".3" />
+        <circle cx="24" cy="24" r="15" stroke="#818cf8" stroke-width="2" />
+        <circle cx="24" cy="24" r="4" fill="#818cf8" />
+        <line x1="24" y1="2" x2="24" y2="46" stroke="#6366f1" stroke-width="1" opacity=".3" />
+        <ellipse cx="24" cy="24" rx="10" ry="22" stroke="#6366f1" stroke-width="1" opacity=".3" />
+      </svg>
+      Domain Inspector
+    </a>
+    <div class="nav-links">
+      <a href="#overview">Overview</a>
+      <a href="#tools">Tools</a>
+      <a href="#connect">Connect</a>
+      <a href="#faq">FAQ</a>
+    </div>
+  </nav>
 
-<div class="page">
+  <div class="page">
 
-<!-- ── Sidebar ── -->
-<aside class="sidebar">
-  <h4>Getting Started</h4>
-  <a href="#overview">Overview</a>
-  <a href="#connect">Connection Setup</a>
-  <a href="#prompts">Prompt Templates</a>
-  <a href="#faq">FAQ</a>
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+      <h4>Getting Started</h4>
+      <a href="#overview">Overview</a>
+      <a href="#connect">Connection Setup</a>
+      <a href="#prompts">Prompt Templates</a>
+      <a href="#faq">FAQ</a>
 
-  <h4>DNS Tools</h4>
-  <a href="#tool-dns_lookup">dns_lookup</a>
-  <a href="#tool-dns_propagation">dns_propagation</a>
-  <a href="#tool-dns_compare">dns_compare</a>
-  <a href="#tool-reverse_dns">reverse_dns</a>
+      <h4>DNS Tools</h4>
+      <a href="#tool-dns_lookup">dns_lookup</a>
+      <a href="#tool-dns_propagation">dns_propagation</a>
+      <a href="#tool-dns_compare">dns_compare</a>
+      <a href="#tool-reverse_dns">reverse_dns</a>
 
-  <h4>Domain Tools</h4>
-  <a href="#tool-domain_report">domain_report</a>
-  <a href="#tool-whois_lookup">whois_lookup</a>
-  <a href="#tool-domain_available">domain_available</a>
-  <a href="#tool-domain_age">domain_age</a>
+      <h4>Domain Tools</h4>
+      <a href="#tool-domain_report">domain_report</a>
+      <a href="#tool-whois_lookup">whois_lookup</a>
+      <a href="#tool-domain_available">domain_available</a>
+      <a href="#tool-domain_age">domain_age</a>
 
-  <h4>Security Tools</h4>
-  <a href="#tool-ssl_check">ssl_check</a>
-  <a href="#tool-http_headers_check">http_headers_check</a>
-  <a href="#tool-email_config_check">email_config_check</a>
-  <a href="#tool-port_check">port_check</a>
+      <h4>Security Tools</h4>
+      <a href="#tool-ssl_check">ssl_check</a>
+      <a href="#tool-http_headers_check">http_headers_check</a>
+      <a href="#tool-email_config_check">email_config_check</a>
+      <a href="#tool-port_check">port_check</a>
 
-  <h4>Web Tools</h4>
-  <a href="#tool-tech_stack_detect">tech_stack_detect</a>
-  <a href="#tool-redirect_chain">redirect_chain</a>
-  <a href="#tool-subdomain_finder">subdomain_finder</a>
+      <h4>Web Tools</h4>
+      <a href="#tool-tech_stack_detect">tech_stack_detect</a>
+      <a href="#tool-redirect_chain">redirect_chain</a>
+      <a href="#tool-subdomain_finder">subdomain_finder</a>
 
-  <h4>API</h4>
-  <a href="#endpoints">Endpoints</a>
-</aside>
+      <h4>API</h4>
+      <a href="#endpoints">Endpoints</a>
 
-<!-- ── Main Content ── -->
-<main class="main">
+      <h4>Legal</h4>
+      <a href="/terms">Terms of Use</a>
+      <a href="/privacy">Privacy Policy</a>
+    </aside>
 
-<!-- Hero -->
-<div class="hero" id="overview">
-  <h1>Domain <span>Inspector</span></h1>
-  <p>A comprehensive domain intelligence server built on the Model Context Protocol. Gives AI assistants the ability to perform DNS lookups, WHOIS queries, SSL certificate checks, email security audits, tech stack detection, subdomain discovery, port scanning, and more — all through a single MCP connection.</p>
-  <div class="hero-badges">
-    <span class="live">Live</span>
-    <span>v2.0.0</span>
-    <span>15 Tools</span>
-    <span>4 Prompts</span>
-    <span>MCP Protocol</span>
-  </div>
-</div>
+    <!-- ── Main Content ── -->
+    <main class="main">
 
-<!-- Stats -->
-<div class="stats">
-  <div class="stat"><span class="val">15</span><span class="label">Intelligence Tools</span></div>
-  <div class="stat"><span class="val">4</span><span class="label">Prompt Templates</span></div>
-  <div class="stat"><span class="val">&lt;3s</span><span class="label">Avg Response</span></div>
-  <div class="stat"><span class="val">8</span><span class="label">Global DNS Resolvers</span></div>
-</div>
+      <!-- Hero -->
+      <div class="hero" id="overview">
+        <h1>Domain <span>Inspector</span></h1>
+        <p>A comprehensive domain intelligence server built on the Model Context Protocol. Gives AI assistants the
+          ability to perform DNS lookups, WHOIS queries, SSL certificate checks, email security audits, tech stack
+          detection, subdomain discovery, port scanning, and more — all through a single MCP connection.</p>
+      </div>
 
-<!-- ── Connect ── -->
-<div class="section" id="connect">
-  <h2>Connection Setup</h2>
-  <p>Add Domain Inspector to your MCP client by adding the following to your configuration file:</p>
-  <pre class="code">{
+      <!-- ── Connect ── -->
+      <div class="section" id="connect">
+        <h2>Connection Setup</h2>
+        <p>Add Domain Inspector to your MCP client by adding the following to your configuration file:</p>
+        <pre class="code">{
   "mcpServers": {
     "domain-inspector": {
       "url": "https://mcpdns.onrender.com/mcp"
     }
   }
 }</pre>
-  <p>Once connected, your AI assistant will automatically have access to all 15 tools. Just ask it to analyze any domain.</p>
+        <p>Once connected, your AI assistant will automatically have access to all 15 tools. Just ask it to analyze any
+          domain.</p>
 
-  <h3 style="margin-top:24px">Compatible Clients</h3>
-  <div class="client-grid">
-    <div class="client"><strong>Claude Desktop</strong>Edit claude_desktop_config.json</div>
-    <div class="client"><strong>Cursor</strong>Settings → MCP Servers</div>
-    <div class="client"><strong>Windsurf</strong>Settings → MCP</div>
-    <div class="client"><strong>VS Code</strong>Copilot MCP extension</div>
-    <div class="client"><strong>Cline</strong>MCP server settings</div>
-    <div class="client"><strong>Any MCP Client</strong>Streamable HTTP transport</div>
-  </div>
-</div>
+        <h3 style="margin-top:24px">Compatible Clients</h3>
+        <div class="client-grid">
+          <div class="client"><strong>Claude Desktop</strong>Edit claude_desktop_config.json</div>
+          <div class="client"><strong>Cursor</strong>Settings → MCP Servers</div>
+          <div class="client"><strong>Windsurf</strong>Settings → MCP</div>
+          <div class="client"><strong>VS Code</strong>Copilot MCP extension</div>
+          <div class="client"><strong>Cline</strong>MCP server settings</div>
+          <div class="client"><strong>Any MCP Client</strong>Streamable HTTP transport</div>
+        </div>
+      </div>
 
-<!-- ── Tools ── -->
-<div class="section" id="tools">
-  <h2>Tools Reference</h2>
-  <p>Each tool returns formatted text output with structured data, status indicators, and actionable insights. Below is the complete reference with real output examples generated from live queries.</p>
+      <!-- ── Tools ── -->
+      <div class="section" id="tools">
+        <h2>Tools Reference</h2>
+        <p>Each tool returns formatted text output with structured data, status indicators, and actionable insights.
+          Below is the complete reference with real output examples generated from live queries.</p>
 
-  <!-- domain_report -->
-  <div class="tool-card" id="tool-domain_report">
-    <div class="tool-header">
-      <div class="tool-name">domain_report</div>
-      <div class="tool-desc">Get a complete domain intelligence report. Runs ALL checks at once: DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, and domain age. This is the recommended starting tool — it gives you everything in one call.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to analyze (e.g. google.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>📊 COMPLETE DOMAIN REPORT: google.com
+        <!-- domain_report -->
+        <div class="tool-card" id="tool-domain_report">
+          <div class="tool-header">
+            <div class="tool-name">domain_report</div>
+            <div class="tool-desc">Get a complete domain intelligence report. Runs ALL checks at once: DNS, WHOIS, email
+              security, SSL, HTTP headers, tech stack detection, and domain age. This is the recommended starting tool —
+              it gives you everything in one call.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to analyze (e.g. google.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>📊 COMPLETE DOMAIN REPORT: google.com
 ══════════════════════════════════════════════
 
 📡 DNS Records for google.com
@@ -275,23 +645,28 @@ footer a:hover{text-decoration:underline}
 📅 Domain Age: google.com
    Age: 28 years, 5 months
    Created: September 15, 1997</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- dns_lookup -->
-  <div class="tool-card" id="tool-dns_lookup">
-    <div class="tool-header">
-      <div class="tool-name">dns_lookup</div>
-      <div class="tool-desc">Look up DNS records for any domain. Supports A, AAAA, MX, TXT, NS, CNAME record types, or ALL to fetch every type at once.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain name to look up (e.g. example.com)</span></div>
-      <div class="param"><code>record_type</code> <span class="type">enum</span> <span class="opt">optional</span> <span class="pdesc">— A, AAAA, MX, TXT, NS, CNAME, or ALL (default: ALL)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com (ALL records)</summary>
-      <pre>✅ A Records: for google.com
+        <!-- dns_lookup -->
+        <div class="tool-card" id="tool-dns_lookup">
+          <div class="tool-header">
+            <div class="tool-name">dns_lookup</div>
+            <div class="tool-desc">Look up DNS records for any domain. Supports A, AAAA, MX, TXT, NS, CNAME record
+              types, or ALL to fetch every type at once.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain name to look up (e.g. example.com)</span>
+            </div>
+            <div class="param"><code>record_type</code> <span class="type">enum</span> <span class="opt">optional</span>
+              <span class="pdesc">— A, AAAA, MX, TXT, NS, CNAME, or ALL (default: ALL)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com (ALL records)</summary>
+            <pre>✅ A Records: for google.com
    172.217.17.78
 
 ✅ AAAA Records:
@@ -313,22 +688,25 @@ footer a:hover{text-decoration:underline}
    ns2.google.com
    ns3.google.com
    ns4.google.com</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- whois_lookup -->
-  <div class="tool-card" id="tool-whois_lookup">
-    <div class="tool-header">
-      <div class="tool-name">whois_lookup</div>
-      <div class="tool-desc">Get WHOIS registration data for a domain including registrar, creation date, expiry date, days remaining, name servers, and registration status.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain name to look up (e.g. example.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>🔍 WHOIS Lookup for google.com
+        <!-- whois_lookup -->
+        <div class="tool-card" id="tool-whois_lookup">
+          <div class="tool-header">
+            <div class="tool-name">whois_lookup</div>
+            <div class="tool-desc">Get WHOIS registration data for a domain including registrar, creation date, expiry
+              date, days remaining, name servers, and registration status.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain name to look up (e.g. example.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>🔍 WHOIS Lookup for google.com
 
 📋 Registrar: MarkMonitor, Inc.
 📅 Created: 1997-09-15
@@ -336,40 +714,47 @@ footer a:hover{text-decoration:underline}
 📅 Updated: 2024-08-02
 📌 Status: clientUpdateProhibited
 🌐 Name Servers: ns2.google.com ns1.google.com ns3.google.com ns4.google.com</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- domain_available -->
-  <div class="tool-card" id="tool-domain_available">
-    <div class="tool-header">
-      <div class="tool-name">domain_available</div>
-      <div class="tool-desc">Check whether a domain is available for registration. If the domain is taken, suggests alternative TLDs (.net, .org, .io, etc.) and checks their availability too.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain name to check (e.g. mycoolapp.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — coolstartup2025.com</summary>
-      <pre>🔍 Domain Availability Check for coolstartup2025.com
+        <!-- domain_available -->
+        <div class="tool-card" id="tool-domain_available">
+          <div class="tool-header">
+            <div class="tool-name">domain_available</div>
+            <div class="tool-desc">Check whether a domain is available for registration. If the domain is taken,
+              suggests alternative TLDs (.net, .org, .io, etc.) and checks their availability too.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain name to check (e.g. mycoolapp.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — coolstartup2025.com</summary>
+            <pre>🔍 Domain Availability Check for coolstartup2025.com
 
 ✅ coolstartup2025.com appears to be AVAILABLE for registration!</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- ssl_check -->
-  <div class="tool-card" id="tool-ssl_check">
-    <div class="tool-header">
-      <div class="tool-name">ssl_check</div>
-      <div class="tool-desc">Check SSL/TLS certificate details for a domain: issuer, validity dates, days remaining, protocol version, cipher suite, and SHA-256 fingerprint. Warns about expiring or invalid certificates.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain or hostname to check (e.g. example.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>🔒 SSL/TLS Certificate Check for google.com
+        <!-- ssl_check -->
+        <div class="tool-card" id="tool-ssl_check">
+          <div class="tool-header">
+            <div class="tool-name">ssl_check</div>
+            <div class="tool-desc">Check SSL/TLS certificate details for a domain: issuer, validity dates, days
+              remaining, protocol version, cipher suite, and SHA-256 fingerprint. Warns about expiring or invalid
+              certificates.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain or hostname to check (e.g. example.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>🔒 SSL/TLS Certificate Check for google.com
 
 🟢 Status: VALID
 
@@ -388,22 +773,26 @@ footer a:hover{text-decoration:underline}
 
 🔑 Fingerprint (SHA-256):
    AB:CD:12:34:... (truncated)</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- email_config_check -->
-  <div class="tool-card" id="tool-email_config_check">
-    <div class="tool-header">
-      <div class="tool-name">email_config_check</div>
-      <div class="tool-desc">Audit email security configuration: MX records, SPF, DKIM (checks 7 common selectors), and DMARC. Returns an overall letter grade A–F based on how many protections are in place.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain name to audit (e.g. example.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>📧 Email Configuration Audit for google.com
+        <!-- email_config_check -->
+        <div class="tool-card" id="tool-email_config_check">
+          <div class="tool-header">
+            <div class="tool-name">email_config_check</div>
+            <div class="tool-desc">Audit email security configuration: MX records, SPF, DKIM (checks 7 common
+              selectors), and DMARC. Returns an overall letter grade A–F based on how many protections are in place.
+            </div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain name to audit (e.g. example.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>📧 Email Configuration Audit for google.com
 
 ✅ MX Records Found (1):
    Priority 10 → smtp.google.com
@@ -422,22 +811,26 @@ footer a:hover{text-decoration:underline}
    🟢 Policy: reject — strongest protection
 
 🟢 Overall Email Security Grade: B (3/4)</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- http_headers_check -->
-  <div class="tool-card" id="tool-http_headers_check">
-    <div class="tool-header">
-      <div class="tool-name">http_headers_check</div>
-      <div class="tool-desc">Audit HTTP security headers and give a letter grade A–F. Checks for HSTS, CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy. Provides specific recommendations for missing headers.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain or URL to check (e.g. example.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>🛡️ HTTP Security Headers Audit: google.com
+        <!-- http_headers_check -->
+        <div class="tool-card" id="tool-http_headers_check">
+          <div class="tool-header">
+            <div class="tool-name">http_headers_check</div>
+            <div class="tool-desc">Audit HTTP security headers and give a letter grade A–F. Checks for HSTS, CSP,
+              X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy. Provides specific
+              recommendations for missing headers.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain or URL to check (e.g. example.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>🛡️ HTTP Security Headers Audit: google.com
 
 CRITICAL HEADERS:
 ❌ Strict-Transport-Security: MISSING
@@ -455,22 +848,25 @@ IMPORTANT HEADERS:
 
 ══════════════════════════════════════════════
 🟡 Overall Security Grade: D (1/6 critical headers present)</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- reverse_dns -->
-  <div class="tool-card" id="tool-reverse_dns">
-    <div class="tool-header">
-      <div class="tool-name">reverse_dns</div>
-      <div class="tool-desc">Reverse DNS lookup — convert an IP address to its hostname(s), or resolve a domain to IP first and then do reverse lookup. Includes forward-confirmation to verify PTR records match.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>target</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— IP address or domain name (e.g. 8.8.8.8 or google.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>🔄 Reverse DNS Lookup for google.com
+        <!-- reverse_dns -->
+        <div class="tool-card" id="tool-reverse_dns">
+          <div class="tool-header">
+            <div class="tool-name">reverse_dns</div>
+            <div class="tool-desc">Reverse DNS lookup — convert an IP address to its hostname(s), or resolve a domain to
+              IP first and then do reverse lookup. Includes forward-confirmation to verify PTR records match.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>target</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— IP address or domain name (e.g. 8.8.8.8 or google.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>🔄 Reverse DNS Lookup for google.com
 
 Resolving google.com to IP addresses first…
 Found 2 IP(s): 172.217.17.78, 2a00:1450:400d:806::200e
@@ -481,23 +877,28 @@ Found 2 IP(s): 172.217.17.78, 2a00:1450:400d:806::200e
 
 ✅ 2a00:1450:400d:806::200e → bud02s21-in-x0e.1e100.net
    🟢 Forward-confirmed ✓</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- dns_propagation -->
-  <div class="tool-card" id="tool-dns_propagation">
-    <div class="tool-header">
-      <div class="tool-name">dns_propagation</div>
-      <div class="tool-desc">Check if DNS has propagated by querying 8 public resolvers worldwide: Google (8.8.8.8, 8.8.4.4), Cloudflare (1.1.1.1, 1.0.0.1), OpenDNS, Quad9, Comodo, and Verisign. Shows whether all resolvers agree.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to check (e.g. example.com)</span></div>
-      <div class="param"><code>record_type</code> <span class="type">string</span> <span class="opt">optional</span> <span class="pdesc">— Record type to check (default: A)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com (A record)</summary>
-      <pre>🌍 DNS Propagation Check for google.com (A)
+        <!-- dns_propagation -->
+        <div class="tool-card" id="tool-dns_propagation">
+          <div class="tool-header">
+            <div class="tool-name">dns_propagation</div>
+            <div class="tool-desc">Check if DNS has propagated by querying 8 public resolvers worldwide: Google
+              (8.8.8.8, 8.8.4.4), Cloudflare (1.1.1.1, 1.0.0.1), OpenDNS, Quad9, Comodo, and Verisign. Shows whether all
+              resolvers agree.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to check (e.g. example.com)</span>
+            </div>
+            <div class="param"><code>record_type</code> <span class="type">string</span> <span
+                class="opt">optional</span> <span class="pdesc">— Record type to check (default: A)</span></div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com (A record)</summary>
+            <pre>🌍 DNS Propagation Check for google.com (A)
 
 Resolver                     │ Result                         │ Status
 ─────────────────────────────┼────────────────────────────────┼────────
@@ -511,22 +912,26 @@ Comodo (8.26.56.26)          │ 142.250.180.206                │ ✅
 Verisign (64.6.64.6)         │ 142.250.74.206                 │ ✅
 
 ✅ DNS is fully propagated (8/8 resolvers responding)</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- subdomain_finder -->
-  <div class="tool-card" id="tool-subdomain_finder">
-    <div class="tool-header">
-      <div class="tool-name">subdomain_finder</div>
-      <div class="tool-desc">Discover common subdomains for a domain by checking ~80 common subdomain prefixes (www, mail, api, cdn, dev, staging, etc.). Groups results by category and shows resolved IP addresses.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to scan for subdomains (e.g. example.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com (partial)</summary>
-      <pre>🔍 Subdomain Discovery: google.com
+        <!-- subdomain_finder -->
+        <div class="tool-card" id="tool-subdomain_finder">
+          <div class="tool-header">
+            <div class="tool-name">subdomain_finder</div>
+            <div class="tool-desc">Discover common subdomains for a domain by checking ~80 common subdomain prefixes
+              (www, mail, api, cdn, dev, staging, etc.). Groups results by category and shows resolved IP addresses.
+            </div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to scan for subdomains (e.g. example.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com (partial)</summary>
+            <pre>🔍 Subdomain Discovery: google.com
 
 Checking 80 common prefixes…
 
@@ -548,23 +953,27 @@ Checking 80 common prefixes…
    chat.google.com                 → 142.250.180.206
 
 📊 30/80 subdomains found</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- redirect_chain -->
-  <div class="tool-card" id="tool-redirect_chain">
-    <div class="tool-header">
-      <div class="tool-name">redirect_chain</div>
-      <div class="tool-desc">Trace the full redirect chain for a URL. Shows every redirect hop with its HTTP status code and Location header, plus the final destination. Useful for debugging redirect loops or verifying HTTP→HTTPS upgrades.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>url</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— URL to trace (e.g. http://example.com)</span></div>
-      <div class="param"><code>max_redirects</code> <span class="type">number</span> <span class="opt">optional</span> <span class="pdesc">— Maximum redirects to follow (default: 10)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — http://google.com</summary>
-      <pre>🔀 Redirect Chain: http://google.com
+        <!-- redirect_chain -->
+        <div class="tool-card" id="tool-redirect_chain">
+          <div class="tool-header">
+            <div class="tool-name">redirect_chain</div>
+            <div class="tool-desc">Trace the full redirect chain for a URL. Shows every redirect hop with its HTTP
+              status code and Location header, plus the final destination. Useful for debugging redirect loops or
+              verifying HTTP→HTTPS upgrades.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>url</code> <span class="type">string</span> <span class="req">required</span> <span
+                class="pdesc">— URL to trace (e.g. http://example.com)</span></div>
+            <div class="param"><code>max_redirects</code> <span class="type">number</span> <span
+                class="opt">optional</span> <span class="pdesc">— Maximum redirects to follow (default: 10)</span></div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — http://google.com</summary>
+            <pre>🔀 Redirect Chain: http://google.com
 
 Hop 1: http://google.com
    → 301 Moved Permanently
@@ -579,22 +988,26 @@ Total Hops: 2
 Final URL: http://www.google.com/
 Total Time: 795ms
 ══════════════════════════════════════════════</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- tech_stack_detect -->
-  <div class="tool-card" id="tool-tech_stack_detect">
-    <div class="tool-header">
-      <div class="tool-name">tech_stack_detect</div>
-      <div class="tool-desc">Detect the technology stack of a website by analyzing HTTP response headers and HTML content. Identifies web servers, CDNs, frameworks, CMS platforms, CSS frameworks, analytics tools, live chat widgets, and hosting providers.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to analyze (e.g. example.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>🖥️ Tech Stack Detection: google.com
+        <!-- tech_stack_detect -->
+        <div class="tool-card" id="tool-tech_stack_detect">
+          <div class="tool-header">
+            <div class="tool-name">tech_stack_detect</div>
+            <div class="tool-desc">Detect the technology stack of a website by analyzing HTTP response headers and HTML
+              content. Identifies web servers, CDNs, frameworks, CMS platforms, CSS frameworks, analytics tools, live
+              chat widgets, and hosting providers.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to analyze (e.g. example.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>🖥️ Tech Stack Detection: google.com
 
 🖥️ Web Server: Google Web Server (GWS)
 
@@ -602,22 +1015,26 @@ Total Time: 795ms
    server: gws
 
 ══════════════════════════════════════════════</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- domain_age -->
-  <div class="tool-card" id="tool-domain_age">
-    <div class="tool-header">
-      <div class="tool-name">domain_age</div>
-      <div class="tool-desc">Calculate the exact age of a domain and show its full registration timeline: creation date, last update, current date, and expiry. Includes a visual progress bar showing how much of the registration period has been used.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to check age of (e.g. example.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com</summary>
-      <pre>📅 Domain Age: google.com
+        <!-- domain_age -->
+        <div class="tool-card" id="tool-domain_age">
+          <div class="tool-header">
+            <div class="tool-name">domain_age</div>
+            <div class="tool-desc">Calculate the exact age of a domain and show its full registration timeline: creation
+              date, last update, current date, and expiry. Includes a visual progress bar showing how much of the
+              registration period has been used.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to check age of (e.g. example.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com</summary>
+            <pre>📅 Domain Age: google.com
 
 📆 Registration Timeline:
 ├── 🟢 Created:  September 15, 1997
@@ -633,23 +1050,29 @@ Total Time: 795ms
 2 years, 7 months until expiry
 
 ══════════════════════════════════════════════</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- dns_compare -->
-  <div class="tool-card" id="tool-dns_compare">
-    <div class="tool-header">
-      <div class="tool-name">dns_compare</div>
-      <div class="tool-desc">Compare DNS records of two domains side by side. Useful for comparing infrastructure setups, verifying DNS migration, or benchmarking against competitors. Shows A, AAAA, MX, NS, and TXT records in a table format.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain1</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— First domain (e.g. google.com)</span></div>
-      <div class="param"><code>domain2</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Second domain (e.g. bing.com)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com vs bing.com</summary>
-      <pre>🔄 DNS Comparison: google.com vs bing.com
+        <!-- dns_compare -->
+        <div class="tool-card" id="tool-dns_compare">
+          <div class="tool-header">
+            <div class="tool-name">dns_compare</div>
+            <div class="tool-desc">Compare DNS records of two domains side by side. Useful for comparing infrastructure
+              setups, verifying DNS migration, or benchmarking against competitors. Shows A, AAAA, MX, NS, and TXT
+              records in a table format.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain1</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— First domain (e.g. google.com)</span>
+            </div>
+            <div class="param"><code>domain2</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Second domain (e.g. bing.com)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com vs bing.com</summary>
+            <pre>🔄 DNS Comparison: google.com vs bing.com
 
 Record Type  │ google.com                     │ bing.com
 ─────────────┼────────────────────────────────┼───────────────────────
@@ -663,23 +1086,29 @@ MX           │ smtp.google.com (pri 10)       │ bing-com.mail.protection
              │                                │   .outlook.com (pri 10)
 ─────────────┼────────────────────────────────┼───────────────────────
 NS           │ ns1-4.google.com               │ ns1-4.msft.net</pre>
-    </details>
-  </div>
+          </details>
+        </div>
 
-  <!-- port_check -->
-  <div class="tool-card" id="tool-port_check">
-    <div class="tool-header">
-      <div class="tool-name">port_check</div>
-      <div class="tool-desc">Check if network ports are open on a domain. By default scans 16 common ports (HTTP, HTTPS, SSH, FTP, SMTP, DNS, IMAP, POP3, MySQL, PostgreSQL, etc.). You can also specify a custom list of ports. Includes service identification and security insights.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain or IP to scan (e.g. example.com)</span></div>
-      <div class="param"><code>ports</code> <span class="type">string</span> <span class="opt">optional</span> <span class="pdesc">— Comma-separated port numbers or "common" (default: common)</span></div>
-    </div>
-    <details class="tool-example">
-      <summary>Example output — google.com (ports 80, 443)</summary>
-      <pre>🔌 Port Check: google.com
+        <!-- port_check -->
+        <div class="tool-card" id="tool-port_check">
+          <div class="tool-header">
+            <div class="tool-name">port_check</div>
+            <div class="tool-desc">Check if network ports are open on a domain. By default scans 16 common ports (HTTP,
+              HTTPS, SSH, FTP, SMTP, DNS, IMAP, POP3, MySQL, PostgreSQL, etc.). You can also specify a custom list of
+              ports. Includes service identification and security insights.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain or IP to scan (e.g. example.com)</span>
+            </div>
+            <div class="param"><code>ports</code> <span class="type">string</span> <span class="opt">optional</span>
+              <span class="pdesc">— Comma-separated port numbers or "common" (default: common)</span>
+            </div>
+          </div>
+          <details class="tool-example">
+            <summary>Example output — google.com (ports 80, 443)</summary>
+            <pre>🔌 Port Check: google.com
 
 Resolved to: 172.217.20.206
 
@@ -694,169 +1123,217 @@ Port    │ Service       │ Status
 
 ✅ Web services: HTTP and HTTPS are both open (good!)
 ══════════════════════════════════════════════</pre>
-    </details>
+          </details>
+        </div>
+
+      </div>
+
+      <!-- ── Prompts ── -->
+      <div class="section" id="prompts">
+        <h2>Prompt Templates</h2>
+        <p>Domain Inspector includes 4 built-in prompt templates that orchestrate multiple tools for common workflows.
+          Your AI assistant can use these directly.</p>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">domain-check</div>
+            <div class="tool-desc">Run a full domain intelligence report with executive summary. Returns DNS, WHOIS,
+              email security, SSL, HTTP headers, tech stack, and domain age — then provides an overall health
+              assessment, urgent issues, and prioritized recommendations.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to analyze</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">security-audit</div>
+            <div class="tool-desc">Perform a security audit by running ssl_check, http_headers_check,
+              email_config_check, and port_check in sequence. Summarizes findings with an overall security rating and
+              recommendations.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to audit</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">compare-domains</div>
+            <div class="tool-desc">Compare two domains side by side using dns_compare, ssl_check, and
+              http_headers_check. Highlights key differences in DNS configuration, SSL certificates, and security
+              headers.</div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain1</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— First domain</span>
+            </div>
+            <div class="param"><code>domain2</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Second domain</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">find-subdomains</div>
+            <div class="tool-desc">Discover all subdomains using subdomain_finder and analyze what each one likely
+              serves (mail, API, CDN, etc.) based on its name and IP. Summarizes the domain's infrastructure footprint.
+            </div>
+          </div>
+          <div class="tool-params">
+            <h4>Parameters</h4>
+            <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span>
+              <span class="pdesc">— Domain to scan</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Endpoints ── -->
+      <div class="section" id="endpoints">
+        <h2>API Endpoints</h2>
+        <p>Domain Inspector exposes the following HTTP endpoints:</p>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">POST /mcp</div>
+            <div class="tool-desc">Main MCP JSON-RPC endpoint. Supports Streamable HTTP transport with session
+              management. Send an <code>initialize</code> request to start a session, then use <code>tools/call</code>,
+              <code>prompts/list</code>, <code>resources/list</code>, etc.
+            </div>
+          </div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">GET /health</div>
+            <div class="tool-desc">Health check endpoint. Returns JSON with server status, tool count, and version. Use
+              this for uptime monitoring.</div>
+          </div>
+          <details class="tool-example">
+            <summary>Example response</summary>
+            <pre>{ "status": "ok", "tools": 15, "version": "2.0.0" }</pre>
+          </details>
+        </div>
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">GET /.well-known/mcp/server-card.json</div>
+            <div class="tool-desc">Server metadata card following the MCP specification. Contains server name,
+              description, version, tool definitions, and configuration schema.</div>
+          </div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-name">GET /icon.svg</div>
+            <div class="tool-desc">Server icon in SVG format for use in MCP client UIs.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── FAQ ── -->
+      <div class="section" id="faq">
+        <h2>Frequently Asked Questions</h2>
+        <div class="faq">
+          <details>
+            <summary>What is Domain Inspector?</summary>
+            <div class="answer">Domain Inspector is an MCP (Model Context Protocol) server that gives AI assistants the
+              ability to perform domain intelligence lookups. It provides 15 tools covering DNS records, WHOIS
+              registration data, SSL/TLS certificates, email security (SPF/DKIM/DMARC), HTTP security headers,
+              technology stack detection, subdomain discovery, port scanning, and more.</div>
+          </details>
+          <details>
+            <summary>What is MCP?</summary>
+            <div class="answer">The Model Context Protocol (MCP) is an open standard by Anthropic that allows AI
+              assistants to connect to external tools and data sources. It enables AI models to take actions and access
+              real-time information through a standardized JSON-RPC interface over HTTP. Think of it as a universal
+              plugin system for AI.</div>
+          </details>
+          <details>
+            <summary>How do I connect?</summary>
+            <div class="answer">Add the server URL (<code>https://mcpdns.onrender.com/mcp</code>) to your MCP client's
+              configuration. Most clients (Claude Desktop, Cursor, Windsurf, VS Code) have a settings panel or JSON
+              config file where you can add MCP servers. Once connected, your AI assistant automatically gains access to
+              all 15 tools.</div>
+          </details>
+          <details>
+            <summary>What data sources does it use?</summary>
+            <div class="answer">All data comes from public sources and standard network protocols: DNS queries via the
+              system resolver, public WHOIS registries, direct TLS connections for certificate inspection, HTTP response
+              headers, and HTML content analysis. No private databases, third-party APIs, or paid services are used.
+            </div>
+          </details>
+          <details>
+            <summary>Is it safe to use?</summary>
+            <div class="answer">Yes. All tools are read-only and only query publicly available data. DNS lookups, WHOIS
+              queries, and SSL checks are standard operations that every web browser performs. Subdomain scanning checks
+              only ~80 common prefixes, and port checking uses conservative timeouts with a limited set of well-known
+              ports.</div>
+          </details>
+          <details>
+            <summary>How fast are the responses?</summary>
+            <div class="answer">Most individual tools respond in under 3 seconds. DNS lookups and SSL checks are
+              typically under 1 second. The full domain_report tool, which runs 7 checks in parallel, usually completes
+              in 3–8 seconds depending on the target domain. Subdomain scanning takes longer (10–20 seconds) as it
+              checks ~80 prefixes.</div>
+          </details>
+          <details>
+            <summary>What are the rate limits?</summary>
+            <div class="answer">There are currently no artificial rate limits on the server. However, the underlying DNS
+              and WHOIS protocols have their own natural rate limits. For responsible use, avoid running bulk scans of
+              hundreds of domains in rapid succession.</div>
+          </details>
+          <details>
+            <summary>Can I use it for commercial purposes?</summary>
+            <div class="answer">Yes, you can use Domain Inspector for commercial purposes including client audits,
+              security assessments, and competitive analysis. The data returned is from public sources and is not
+              proprietary.</div>
+          </details>
+        </div>
+      </div>
+
+    </main>
   </div>
 
-</div>
+  <!-- ── Footer ── -->
+  <footer>
+    <span>&copy; 2025 Domain Inspector. All rights reserved.</span>
+    <span><a href="/terms">Terms</a> &middot; <a href="/privacy">Privacy</a> &middot; <a
+        href="https://modelcontextprotocol.io">MCP Protocol</a></span>
+  </footer>
 
-<!-- ── Prompts ── -->
-<div class="section" id="prompts">
-  <h2>Prompt Templates</h2>
-  <p>Domain Inspector includes 4 built-in prompt templates that orchestrate multiple tools for common workflows. Your AI assistant can use these directly.</p>
-
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">domain-check</div>
-      <div class="tool-desc">Run a full domain intelligence report using the domain_report tool. Returns DNS, WHOIS, email security, SSL, HTTP headers, tech stack, and domain age in one comprehensive output.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to analyze</span></div>
-    </div>
-  </div>
-
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">security-audit</div>
-      <div class="tool-desc">Perform a security audit by running ssl_check, http_headers_check, email_config_check, and port_check in sequence. Summarizes findings with an overall security rating and recommendations.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to audit</span></div>
-    </div>
-  </div>
-
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">compare-domains</div>
-      <div class="tool-desc">Compare two domains side by side using dns_compare, ssl_check, and http_headers_check. Highlights key differences in DNS configuration, SSL certificates, and security headers.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain1</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— First domain</span></div>
-      <div class="param"><code>domain2</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Second domain</span></div>
-    </div>
-  </div>
-
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">find-subdomains</div>
-      <div class="tool-desc">Discover all subdomains using subdomain_finder and analyze what each one likely serves (mail, API, CDN, etc.) based on its name and IP. Summarizes the domain's infrastructure footprint.</div>
-    </div>
-    <div class="tool-params">
-      <h4>Parameters</h4>
-      <div class="param"><code>domain</code> <span class="type">string</span> <span class="req">required</span> <span class="pdesc">— Domain to scan</span></div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Endpoints ── -->
-<div class="section" id="endpoints">
-  <h2>API Endpoints</h2>
-  <p>Domain Inspector exposes the following HTTP endpoints:</p>
-
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">POST /mcp</div>
-      <div class="tool-desc">Main MCP JSON-RPC endpoint. Supports Streamable HTTP transport with session management. Send an <code>initialize</code> request to start a session, then use <code>tools/call</code>, <code>prompts/list</code>, <code>resources/list</code>, etc.</div>
-    </div>
-  </div>
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">GET /health</div>
-      <div class="tool-desc">Health check endpoint. Returns JSON with server status, tool count, and version. Use this for uptime monitoring.</div>
-    </div>
-    <details class="tool-example">
-      <summary>Example response</summary>
-      <pre>{ "status": "ok", "tools": 15, "version": "2.0.0" }</pre>
-    </details>
-  </div>
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">GET /.well-known/mcp/server-card.json</div>
-      <div class="tool-desc">Server metadata card following the MCP specification. Contains server name, description, version, tool definitions, and configuration schema.</div>
-    </div>
-  </div>
-  <div class="tool-card">
-    <div class="tool-header">
-      <div class="tool-name">GET /icon.svg</div>
-      <div class="tool-desc">Server icon in SVG format for use in MCP client UIs.</div>
-    </div>
-  </div>
-</div>
-
-<!-- ── FAQ ── -->
-<div class="section" id="faq">
-  <h2>Frequently Asked Questions</h2>
-  <div class="faq">
-    <details>
-      <summary>What is Domain Inspector?</summary>
-      <div class="answer">Domain Inspector is an MCP (Model Context Protocol) server that gives AI assistants the ability to perform domain intelligence lookups. It provides 15 tools covering DNS records, WHOIS registration data, SSL/TLS certificates, email security (SPF/DKIM/DMARC), HTTP security headers, technology stack detection, subdomain discovery, port scanning, and more.</div>
-    </details>
-    <details>
-      <summary>What is MCP?</summary>
-      <div class="answer">The Model Context Protocol (MCP) is an open standard by Anthropic that allows AI assistants to connect to external tools and data sources. It enables AI models to take actions and access real-time information through a standardized JSON-RPC interface over HTTP. Think of it as a universal plugin system for AI.</div>
-    </details>
-    <details>
-      <summary>How do I connect?</summary>
-      <div class="answer">Add the server URL (<code>https://mcpdns.onrender.com/mcp</code>) to your MCP client's configuration. Most clients (Claude Desktop, Cursor, Windsurf, VS Code) have a settings panel or JSON config file where you can add MCP servers. Once connected, your AI assistant automatically gains access to all 15 tools.</div>
-    </details>
-    <details>
-      <summary>What data sources does it use?</summary>
-      <div class="answer">All data comes from public sources and standard network protocols: DNS queries via the system resolver, public WHOIS registries, direct TLS connections for certificate inspection, HTTP response headers, and HTML content analysis. No private databases, third-party APIs, or paid services are used.</div>
-    </details>
-    <details>
-      <summary>Is it safe to use?</summary>
-      <div class="answer">Yes. All tools are read-only and only query publicly available data. DNS lookups, WHOIS queries, and SSL checks are standard operations that every web browser performs. Subdomain scanning checks only ~80 common prefixes, and port checking uses conservative timeouts with a limited set of well-known ports.</div>
-    </details>
-    <details>
-      <summary>How fast are the responses?</summary>
-      <div class="answer">Most individual tools respond in under 3 seconds. DNS lookups and SSL checks are typically under 1 second. The full domain_report tool, which runs 7 checks in parallel, usually completes in 3–8 seconds depending on the target domain. Subdomain scanning takes longer (10–20 seconds) as it checks ~80 prefixes.</div>
-    </details>
-    <details>
-      <summary>What are the rate limits?</summary>
-      <div class="answer">There are currently no artificial rate limits on the server. However, the underlying DNS and WHOIS protocols have their own natural rate limits. For responsible use, avoid running bulk scans of hundreds of domains in rapid succession.</div>
-    </details>
-    <details>
-      <summary>Can I use it for commercial purposes?</summary>
-      <div class="answer">Yes, you can use Domain Inspector for commercial purposes including client audits, security assessments, and competitive analysis. The data returned is from public sources and is not proprietary.</div>
-    </details>
-  </div>
-</div>
-
-</main>
-</div>
-
-<!-- ── Footer ── -->
-<footer>
-  <span>&copy; 2025 Domain Inspector. All rights reserved.</span>
-  <span><a href="https://modelcontextprotocol.io">MCP Protocol</a></span>
-</footer>
-
-<script>
-// Highlight active sidebar link on scroll
-const sections = document.querySelectorAll('[id]');
-const sidebarLinks = document.querySelectorAll('.sidebar a');
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      const id = entry.target.id;
-      sidebarLinks.forEach(link => {
-        link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+  <script>
+    // Highlight active sidebar link on scroll
+    const sections = document.querySelectorAll('[id]');
+    const sidebarLinks = document.querySelectorAll('.sidebar a');
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          sidebarLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+          });
+        }
       });
-    }
-  });
-}, { rootMargin: '-80px 0px -60% 0px' });
-sections.forEach(s => observer.observe(s));
+    }, { rootMargin: '-80px 0px -60% 0px' });
+    sections.forEach(s => observer.observe(s));
 
-// Smooth scroll
-document.querySelectorAll('a[href^="#"]').forEach(a => {
-  a.addEventListener('click', e => {
-    e.preventDefault();
-    const target = document.querySelector(a.getAttribute('href'));
-    if (target) target.scrollIntoView({ behavior: 'smooth' });
-  });
-});
-</script>
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
 </body>
+
 </html>

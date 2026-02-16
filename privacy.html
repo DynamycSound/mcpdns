@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Domain Inspector</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#09090b;--surface:#111113;--border:#27272a;--text:#fafafa;--text2:#a1a1aa;--text3:#71717a;--accent2:#818cf8;--radius:12px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
+.navbar{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(9,9,11,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border);z-index:100;display:flex;align-items:center;padding:0 24px}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:600;font-size:15px}
+.nav-logo svg{width:28px;height:28px}
+.nav-links{display:flex;gap:4px;margin-left:auto}
+.nav-links a{color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;padding:6px 12px;border-radius:6px;transition:color .15s,background .15s}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.wrap{max-width:720px;margin:0 auto;padding:96px 24px 64px}
+h1{font-size:28px;font-weight:700;margin-bottom:8px}
+.updated{font-size:13px;color:var(--text3);margin-bottom:32px}
+h2{font-size:18px;font-weight:600;margin:32px 0 12px}
+p,li{font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:12px}
+ul{padding-left:20px;margin-bottom:12px}
+li{margin-bottom:6px}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+footer{max-width:720px;margin:0 auto;padding:24px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);display:flex;justify-content:space-between}
+@media(max-width:480px){.wrap{padding:80px 16px 48px}h1{font-size:22px}footer{flex-direction:column;gap:8px}}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <a href="/" class="nav-logo">
+    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity=".3"/><circle cx="24" cy="24" r="15" stroke="#818cf8" stroke-width="2"/><circle cx="24" cy="24" r="4" fill="#818cf8"/><line x1="24" y1="2" x2="24" y2="46" stroke="#6366f1" stroke-width="1" opacity=".3"/><ellipse cx="24" cy="24" rx="10" ry="22" stroke="#6366f1" stroke-width="1" opacity=".3"/></svg>
+    Domain Inspector
+  </a>
+  <div class="nav-links">
+    <a href="/">Docs</a>
+    <a href="/terms">Terms</a>
+    <a href="/privacy">Privacy</a>
+  </div>
+</nav>
+
+<div class="wrap">
+<h1>Privacy Policy</h1>
+<p class="updated">Last updated: February 16, 2025</p>
+
+<p>This Privacy Policy describes how Domain Inspector ("we", "us", or "our") handles information when you use our domain intelligence service ("Service"). We are committed to transparency about our data practices.</p>
+
+<h2>1. Information We Do Not Collect</h2>
+<p>Domain Inspector does not collect, store, or process any personal information. Specifically:</p>
+<ul>
+  <li>We do not require user accounts or registration.</li>
+  <li>We do not collect names, email addresses, or other personal identifiers.</li>
+  <li>We do not use cookies or tracking technologies on our website.</li>
+  <li>We do not use analytics services (no Google Analytics, no tracking pixels).</li>
+  <li>We do not store the domains you query or the results returned.</li>
+</ul>
+
+<h2>2. Information Processed During Requests</h2>
+<p>When you use the Service through an MCP client, the following information is processed transiently (in memory only, not stored):</p>
+<ul>
+  <li><strong>Domain names</strong> — The domains you submit for analysis are used to perform DNS, WHOIS, SSL, and other lookups. These are not logged or stored after the response is returned.</li>
+  <li><strong>IP addresses</strong> — Your IP address may be visible in standard HTTP server logs maintained by our hosting provider (Render). We do not independently log or process IP addresses.</li>
+  <li><strong>MCP session identifiers</strong> — Temporary session IDs are generated for the duration of an MCP connection and are discarded when the session ends.</li>
+</ul>
+
+<h2>3. Third-Party Data Sources</h2>
+<p>To fulfill your requests, the Service queries the following external, publicly accessible sources:</p>
+<ul>
+  <li><strong>DNS servers</strong> — Public DNS resolvers (Google, Cloudflare, OpenDNS, Quad9, etc.) to resolve domain records.</li>
+  <li><strong>WHOIS registries</strong> — Public WHOIS servers operated by domain registries to retrieve registration data.</li>
+  <li><strong>TLS endpoints</strong> — Direct TLS connections to target domains to inspect SSL certificates.</li>
+  <li><strong>HTTP servers</strong> — HTTP requests to target domains to analyze response headers and detect technologies.</li>
+</ul>
+<p>These third parties have their own privacy policies. The domain names you query are transmitted to these services as part of standard protocol operations.</p>
+
+<h2>4. Hosting Provider</h2>
+<p>The Service is hosted on Render (render.com). Render may collect standard server access logs including IP addresses, request timestamps, and HTTP metadata as part of their infrastructure. Please refer to <a href="https://render.com/privacy">Render's Privacy Policy</a> for details on their data practices.</p>
+
+<h2>5. Data Retention</h2>
+<p>We do not retain any user data. All query data is processed in memory and discarded immediately after the response is sent. MCP sessions are ephemeral and cleaned up when the connection closes.</p>
+
+<h2>6. Children's Privacy</h2>
+<p>The Service is not directed at children under the age of 13. We do not knowingly collect information from children.</p>
+
+<h2>7. International Users</h2>
+<p>The Service is hosted in the United States. If you access the Service from outside the United States, your requests will be processed on servers located in the United States. By using the Service, you consent to this transfer.</p>
+
+<h2>8. Changes to This Policy</h2>
+<p>We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated "Last updated" date. Your continued use of the Service after changes constitutes acceptance of the updated policy.</p>
+
+<h2>9. Contact</h2>
+<p>If you have questions about this Privacy Policy, please open an issue on our project page or contact us through the available channels on our website.</p>
+</div>
+
+<footer>
+  <span>&copy; 2025 Domain Inspector. All rights reserved.</span>
+  <span><a href="/terms">Terms</a> &middot; <a href="/privacy">Privacy</a></span>
+</footer>
+</body>
+</html>
