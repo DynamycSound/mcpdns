@@ -66,132 +66,88 @@ async function whoisWithRetry(domain, maxRetries = 2) {
 async function dnsLookup(domain, recordType) {
   domain = cleanDomain(domain);
   const types = recordType === "ALL" ? ["A", "AAAA", "MX", "TXT", "NS", "CNAME"] : [recordType];
-  const lines = [`🔍 DNS Lookup for **${domain}**\n`];
+  const result = { domain, queriedTypes: types, records: {} };
 
   for (const t of types) {
     const records = await resolveDns(domain, t);
     if (!records) {
-      lines.push(`❌ ${t}: No records found`);
+      result.records[t] = null;
       continue;
     }
     if (t === "MX") {
-      const sorted = records.sort((a, b) => a.priority - b.priority);
-      lines.push(`✅ ${t} Records:`);
-      sorted.forEach((r) => lines.push(`   Priority ${r.priority} → ${r.exchange}`));
+      result.records[t] = records.sort((a, b) => a.priority - b.priority).map((r) => ({ priority: r.priority, exchange: r.exchange }));
     } else if (t === "TXT") {
-      lines.push(`✅ ${t} Records:`);
-      records.forEach((r) => {
-        const val = Array.isArray(r) ? r.join("") : r;
-        lines.push(`   ${val}`);
-      });
+      result.records[t] = records.map((r) => (Array.isArray(r) ? r.join("") : r));
     } else {
-      lines.push(`✅ ${t} Records:`);
-      records.forEach((r) => lines.push(`   ${r}`));
+      result.records[t] = records;
     }
   }
-  return lines.join("\n");
+  const found = Object.entries(result.records).filter(([, v]) => v !== null).length;
+  result.summary = `${found}/${types.length} record types found`;
+  return result;
 }
 
 async function whoisLookup(domain) {
   domain = cleanDomain(domain);
-  const lines = [`🔍 WHOIS Lookup for **${domain}**\n`];
+  const result = { domain, error: null };
   try {
     const rec = await whoisWithRetry(domain);
+    result.registrar = rec.registrar || rec.Registrar || "Unknown";
 
-    const registrar = rec.registrar || rec.Registrar || "Unknown";
     const createdRaw = rec.creationDate || rec.createdDate || rec.created || rec.CreationDate || null;
     const expiryRaw = rec.registrarRegistrationExpirationDate || rec.expirationDate || rec.expiryDate || rec.expires || rec.ExpirationDate || null;
     const updatedRaw = rec.updatedDate || rec.lastUpdated || rec.UpdatedDate || null;
     const status = rec.domainStatus || rec.status || rec.Status || "Unknown";
     const nameServers = rec.nameServer || rec.nameServers || rec.NameServer || null;
 
-    lines.push(`📋 **Registrar:** ${registrar}`);
-
-    if (createdRaw) {
-      const created = new Date(createdRaw);
-      lines.push(`📅 **Created:** ${created.toISOString().split("T")[0]}`);
-    }
+    result.created = createdRaw ? new Date(createdRaw).toISOString().split("T")[0] : null;
+    result.expires = expiryRaw ? new Date(expiryRaw).toISOString().split("T")[0] : null;
+    result.updated = updatedRaw ? new Date(updatedRaw).toISOString().split("T")[0] : null;
 
     if (expiryRaw) {
-      const expiry = new Date(expiryRaw);
-      const now = new Date();
-      const daysRemaining = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-      let indicator;
-      if (daysRemaining < 0) indicator = "🔴 EXPIRED";
-      else if (daysRemaining <= 30) indicator = "🔴 EXPIRING VERY SOON";
-      else if (daysRemaining <= 90) indicator = "🟡 Expiring soon";
-      else indicator = "🟢 OK";
-      lines.push(`📅 **Expires:** ${expiry.toISOString().split("T")[0]} (${daysRemaining} days remaining) ${indicator}`);
+      const daysRemaining = Math.ceil((new Date(expiryRaw) - new Date()) / (1000 * 60 * 60 * 24));
+      result.daysUntilExpiry = daysRemaining;
+      result.expiryStatus = daysRemaining < 0 ? "EXPIRED" : daysRemaining <= 30 ? "EXPIRING_SOON" : daysRemaining <= 90 ? "EXPIRING" : "OK";
     }
 
-    if (updatedRaw) {
-      const updated = new Date(updatedRaw);
-      lines.push(`📅 **Updated:** ${updated.toISOString().split("T")[0]}`);
-    }
-
-    if (status) {
-      const statuses = Array.isArray(status) ? status : [status];
-      lines.push(`📌 **Status:** ${statuses.map((s) => s.toString().split(" ")[0]).join(", ")}`);
-    }
-
-    if (nameServers) {
-      const ns = Array.isArray(nameServers) ? nameServers : [nameServers];
-      lines.push(`🌐 **Name Servers:** ${ns.join(", ")}`);
-    }
+    result.status = Array.isArray(status) ? status.map((s) => s.toString().split(" ")[0]) : [String(status).split(" ")[0]];
+    result.nameServers = nameServers ? (Array.isArray(nameServers) ? nameServers : [nameServers]) : [];
   } catch (err) {
-    lines.push(`❌ WHOIS lookup failed: ${err.message}`);
+    result.error = err.message;
   }
-  return lines.join("\n");
+  return result;
 }
 
 async function domainAvailable(domain) {
   domain = cleanDomain(domain);
-  const lines = [`🔍 Domain Availability Check for **${domain}**\n`];
+  const result = { domain, available: false, alternatives: [] };
 
-  // Fast check: try DNS first
   let taken = false;
   const aRecords = await resolveDns(domain, "A");
   const aaaaRecords = await resolveDns(domain, "AAAA");
-  if (aRecords || aaaaRecords) {
-    taken = true;
-  }
+  if (aRecords || aaaaRecords) taken = true;
 
-  // Fallback: WHOIS
   if (!taken) {
     try {
       const rec = await whoisWithRetry(domain, 1);
-      if (rec && (rec.domainName || rec.domain || rec.registrar || rec.Registrar || rec.created || rec.source)) {
-        taken = true;
-      }
-    } catch {
-      // WHOIS failure — treat as potentially available
-    }
+      if (rec && (rec.domainName || rec.domain || rec.registrar || rec.Registrar || rec.created || rec.source)) taken = true;
+    } catch { /* treat as potentially available */ }
   }
 
-  if (!taken) {
-    lines.push(`✅ **${domain}** appears to be **AVAILABLE** for registration!`);
-  } else {
-    lines.push(`❌ **${domain}** is **TAKEN**.\n`);
+  result.available = !taken;
 
-    // Suggest alternatives
+  if (taken) {
     const base = domain.split(".")[0];
     const alts = [".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".xyz", ".info", ".me"];
-    const suggestions = [];
     for (const tld of alts) {
       const alt = base + tld;
       if (alt === domain) continue;
       const altA = await resolveDns(alt, "A");
-      if (!altA) suggestions.push(alt);
-      if (suggestions.length >= 5) break;
-    }
-    if (suggestions.length > 0) {
-      lines.push(`💡 **Potentially available alternatives:**`);
-      suggestions.forEach((s) => lines.push(`   🟢 ${s}`));
-    } else {
-      lines.push(`💡 No obvious alternative TLDs appear available for "${base}".`);
+      if (!altA) result.alternatives.push(alt);
+      if (result.alternatives.length >= 5) break;
     }
   }
-  return lines.join("\n");
+  return result;
 }
 
 const EMAIL_PROVIDERS = [
@@ -208,31 +164,24 @@ const DKIM_SELECTORS = ["default", "google", "selector1", "selector2", "k1", "dk
 
 async function emailConfigCheck(domain) {
   domain = cleanDomain(domain);
-  const lines = [`📧 Email Configuration Audit for **${domain}**\n`];
-  let score = 0;
-  const maxScore = 4; // MX, SPF, DKIM, DMARC
+  const result = { domain, score: 0, maxScore: 4, checks: {}, grade: "F", missing: [], provider: null };
 
   // --- MX ---
   const mxRecords = await resolveDns(domain, "MX");
   if (mxRecords && mxRecords.length > 0) {
-    score++;
+    result.score++;
     const sorted = mxRecords.sort((a, b) => a.priority - b.priority);
-    lines.push(`✅ **MX Records Found** (${sorted.length}):`);
-    sorted.forEach((r) => lines.push(`   Priority ${r.priority} → ${r.exchange}`));
-    // Detect provider
+    result.checks.mx = { found: true, records: sorted.map((r) => ({ priority: r.priority, exchange: r.exchange })) };
     const allExchanges = sorted.map((r) => r.exchange).join(" ");
     for (const ep of EMAIL_PROVIDERS) {
-      if (ep.pattern.test(allExchanges)) {
-        lines.push(`   📌 Detected provider: **${ep.name}**`);
-        break;
-      }
+      if (ep.pattern.test(allExchanges)) { result.provider = ep.name; break; }
     }
   } else {
-    lines.push(`❌ **No MX Records** — this domain cannot receive email`);
+    result.checks.mx = { found: false, records: [] };
+    result.missing.push("MX");
   }
 
   // --- SPF ---
-  lines.push("");
   const txtRecords = await resolveDns(domain, "TXT");
   let spfFound = false;
   if (txtRecords) {
@@ -240,106 +189,69 @@ async function emailConfigCheck(domain) {
       const val = Array.isArray(rec) ? rec.join("") : rec;
       if (val.startsWith("v=spf1")) {
         spfFound = true;
-        score++;
-        lines.push(`✅ **SPF Record Found:**`);
-        lines.push(`   ${val}`);
-        if (val.includes("-all")) {
-          lines.push(`   🟢 Strict policy (-all) — good`);
-        } else if (val.includes("~all")) {
-          lines.push(`   🟡 Soft-fail policy (~all) — acceptable`);
-        } else if (val.includes("?all")) {
-          lines.push(`   🟡 Neutral policy (?all) — weak`);
-        } else if (val.includes("+all")) {
-          lines.push(`   🔴 Permissive policy (+all) — **dangerous**, allows any sender`);
-        }
+        result.score++;
+        let policy = "unknown";
+        if (val.includes("-all")) policy = "strict (-all)";
+        else if (val.includes("~all")) policy = "soft-fail (~all)";
+        else if (val.includes("?all")) policy = "neutral (?all)";
+        else if (val.includes("+all")) policy = "permissive (+all) - DANGEROUS";
+        result.checks.spf = { found: true, record: val, policy };
         break;
       }
     }
   }
-  if (!spfFound) {
-    lines.push(`❌ **No SPF Record** — vulnerable to email spoofing`);
-  }
+  if (!spfFound) { result.checks.spf = { found: false }; result.missing.push("SPF"); }
 
   // --- DKIM ---
-  lines.push("");
-  let dkimFound = false;
-  const dkimResults = [];
+  const dkimSelectors = [];
   for (const sel of DKIM_SELECTORS) {
-    const dkimDomain = `${sel}._domainkey.${domain}`;
-    const dkimTxt = await resolveDns(dkimDomain, "TXT");
-    if (dkimTxt) {
-      dkimFound = true;
-      dkimResults.push(sel);
-    }
+    const dkimTxt = await resolveDns(`${sel}._domainkey.${domain}`, "TXT");
+    if (dkimTxt) dkimSelectors.push(sel);
   }
-  if (dkimFound) {
-    score++;
-    lines.push(`✅ **DKIM Records Found** (selectors: ${dkimResults.join(", ")}):`);
-    dkimResults.forEach((sel) => lines.push(`   🟢 ${sel}._domainkey.${domain}`));
+  if (dkimSelectors.length > 0) {
+    result.score++;
+    result.checks.dkim = { found: true, selectors: dkimSelectors };
   } else {
-    lines.push(`❌ **No DKIM Records** found for common selectors (${DKIM_SELECTORS.join(", ")})`);
-    lines.push(`   ⚠️ DKIM may use custom selectors not checked here`);
+    result.checks.dkim = { found: false, selectorsChecked: DKIM_SELECTORS };
+    result.missing.push("DKIM");
   }
 
   // --- DMARC ---
-  lines.push("");
-  const dmarcDomain = `_dmarc.${domain}`;
-  const dmarcTxt = await resolveDns(dmarcDomain, "TXT");
+  const dmarcTxt = await resolveDns(`_dmarc.${domain}`, "TXT");
   let dmarcFound = false;
   if (dmarcTxt) {
     for (const rec of dmarcTxt) {
       const val = Array.isArray(rec) ? rec.join("") : rec;
       if (val.startsWith("v=DMARC1")) {
         dmarcFound = true;
-        score++;
-        lines.push(`✅ **DMARC Record Found:**`);
-        lines.push(`   ${val}`);
-        if (/p=reject/i.test(val)) {
-          lines.push(`   🟢 Policy: reject — strongest protection`);
-        } else if (/p=quarantine/i.test(val)) {
-          lines.push(`   🟡 Policy: quarantine — good`);
-        } else if (/p=none/i.test(val)) {
-          lines.push(`   🟡 Policy: none — monitoring only, no protection`);
-        }
+        result.score++;
+        let policy = "unknown";
+        if (/p=reject/i.test(val)) policy = "reject";
+        else if (/p=quarantine/i.test(val)) policy = "quarantine";
+        else if (/p=none/i.test(val)) policy = "none (monitoring only)";
+        result.checks.dmarc = { found: true, record: val, policy };
         break;
       }
     }
   }
-  if (!dmarcFound) {
-    lines.push(`❌ **No DMARC Record** — no policy to protect against spoofing`);
-  }
+  if (!dmarcFound) { result.checks.dmarc = { found: false }; result.missing.push("DMARC"); }
 
   // --- Grade ---
-  lines.push("");
-  let grade, emoji;
-  if (score === 4) { grade = "A"; emoji = "🟢"; }
-  else if (score === 3) { grade = "B"; emoji = "🟢"; }
-  else if (score === 2) { grade = "C"; emoji = "🟡"; }
-  else if (score === 1) { grade = "D"; emoji = "🟡"; }
-  else { grade = "F"; emoji = "🔴"; }
+  const grades = { 4: "A", 3: "B", 2: "C", 1: "D", 0: "F" };
+  result.grade = grades[result.score] || "F";
 
-  lines.push(`${emoji} **Overall Email Security Grade: ${grade}** (${score}/${maxScore})`);
-  if (score < 4) {
-    const missing = [];
-    if (!mxRecords || mxRecords.length === 0) missing.push("MX");
-    if (!spfFound) missing.push("SPF");
-    if (!dkimFound) missing.push("DKIM");
-    if (!dmarcFound) missing.push("DMARC");
-    lines.push(`⚠️ Missing: ${missing.join(", ")}`);
-  }
-
-  return lines.join("\n");
+  return result;
 }
 
 async function sslCheck(domain) {
   domain = cleanDomain(domain);
-  const lines = [`🔒 SSL/TLS Certificate Check for **${domain}**\n`];
+  const result = { domain, error: null };
 
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       sock.destroy();
-      lines.push(`❌ SSL check timed out after 10 seconds`);
-      resolve(lines.join("\n"));
+      result.error = "SSL check timed out after 10 seconds";
+      resolve(result);
     }, 10000);
 
     const sock = tls.connect(443, domain, { rejectUnauthorized: false, servername: domain }, () => {
@@ -347,9 +259,9 @@ async function sslCheck(domain) {
 
       const cert = sock.getPeerCertificate();
       if (!cert || Object.keys(cert).length === 0) {
-        lines.push(`❌ No SSL certificate found for ${domain}`);
+        result.error = "No SSL certificate found";
         sock.end();
-        resolve(lines.join("\n"));
+        resolve(result);
         return;
       }
 
@@ -360,69 +272,26 @@ async function sslCheck(domain) {
       const isExpired = daysRemaining < 0;
       const authorized = sock.authorized;
 
-      // Status
-      if (isExpired) {
-        lines.push(`🔴 **Status: EXPIRED** (expired ${Math.abs(daysRemaining)} days ago)`);
-      } else if (!authorized) {
-        lines.push(`🟡 **Status: INVALID** — certificate exists but is not trusted`);
-      } else {
-        lines.push(`🟢 **Status: VALID**`);
-      }
-
-      // Subject
-      lines.push(`\n📋 **Certificate Details:**`);
-      lines.push(`   **Common Name:** ${cert.subject?.CN || "N/A"}`);
-
-      // SANs
-      if (cert.subjectaltname) {
-        const sans = cert.subjectaltname.split(", ").map((s) => s.replace("DNS:", ""));
-        lines.push(`   **Alt Names:** ${sans.join(", ")}`);
-      }
-
-      // Issuer
-      const issuerOrg = cert.issuer?.O || cert.issuer?.CN || "Unknown";
-      lines.push(`   **Issuer:** ${issuerOrg}`);
-
-      // Dates
-      lines.push(`   **Valid From:** ${validFrom.toISOString().split("T")[0]}`);
-      lines.push(`   **Valid To:** ${validTo.toISOString().split("T")[0]}`);
-
-      // Days remaining with color
-      let indicator;
-      if (isExpired) {
-        indicator = `🔴 EXPIRED ${Math.abs(daysRemaining)} days ago`;
-      } else if (daysRemaining <= 14) {
-        indicator = `🔴 ${daysRemaining} days remaining — RENEW IMMEDIATELY`;
-      } else if (daysRemaining <= 30) {
-        indicator = `🟡 ${daysRemaining} days remaining — renew soon`;
-      } else if (daysRemaining <= 60) {
-        indicator = `🟡 ${daysRemaining} days remaining`;
-      } else {
-        indicator = `🟢 ${daysRemaining} days remaining`;
-      }
-      lines.push(`   **Expiry:** ${indicator}`);
-
-      // Protocol
-      lines.push(`   **Protocol:** ${sock.getProtocol?.() || "N/A"}`);
-
-      // Serial
-      if (cert.serialNumber) {
-        lines.push(`   **Serial:** ${cert.serialNumber}`);
-      }
-
-      // Fingerprint
-      if (cert.fingerprint256) {
-        lines.push(`   **Fingerprint (SHA-256):** ${cert.fingerprint256}`);
-      }
+      result.status = isExpired ? "EXPIRED" : !authorized ? "INVALID" : "VALID";
+      result.commonName = cert.subject?.CN || null;
+      result.altNames = cert.subjectaltname ? cert.subjectaltname.split(", ").map((s) => s.replace("DNS:", "")) : [];
+      result.issuer = cert.issuer?.O || cert.issuer?.CN || "Unknown";
+      result.validFrom = validFrom.toISOString().split("T")[0];
+      result.validTo = validTo.toISOString().split("T")[0];
+      result.daysRemaining = daysRemaining;
+      result.expiryUrgency = isExpired ? "EXPIRED" : daysRemaining <= 14 ? "CRITICAL" : daysRemaining <= 30 ? "WARNING" : daysRemaining <= 60 ? "NOTICE" : "OK";
+      result.protocol = sock.getProtocol?.() || null;
+      result.serialNumber = cert.serialNumber || null;
+      result.fingerprint256 = cert.fingerprint256 || null;
 
       sock.end();
-      resolve(lines.join("\n"));
+      resolve(result);
     });
 
     sock.on("error", (err) => {
       clearTimeout(timeout);
-      lines.push(`❌ SSL check failed: ${err.message}`);
-      resolve(lines.join("\n"));
+      result.error = err.message;
+      resolve(result);
     });
   });
 }
@@ -435,47 +304,44 @@ const IP_REGEX = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 
 async function reverseDns(target) {
   target = target.trim();
-  const lines = [`🔄 Reverse DNS Lookup for **${target}**\n`];
+  const result = { target, isIp: IP_REGEX.test(target), resolvedIps: [], lookups: [] };
 
   const ipsToReverse = [];
 
-  if (IP_REGEX.test(target)) {
+  if (result.isIp) {
     ipsToReverse.push(target);
   } else {
     const domain = cleanDomain(target);
-    lines.push(`Resolving **${domain}** to IP addresses first…\n`);
+    result.resolvedFrom = domain;
     const aRecs = await resolveDns(domain, "A");
     const aaaaRecs = await resolveDns(domain, "AAAA");
     if (aRecs) aRecs.forEach((ip) => ipsToReverse.push(ip));
     if (aaaaRecs) aaaaRecs.forEach((ip) => ipsToReverse.push(ip));
     if (ipsToReverse.length === 0) {
-      lines.push(`❌ Could not resolve ${domain} to any IP address`);
-      return lines.join("\n");
+      result.error = `Could not resolve ${domain} to any IP address`;
+      return result;
     }
-    lines.push(`Found ${ipsToReverse.length} IP(s): ${ipsToReverse.join(", ")}\n`);
   }
+
+  result.resolvedIps = ipsToReverse;
 
   for (const ip of ipsToReverse) {
     try {
       const hostnames = await new Promise((resolve, reject) => {
         dns.reverse(ip, (err, hosts) => (err ? reject(err) : resolve(hosts)));
       });
-      lines.push(`✅ **${ip}** → ${hostnames.join(", ")}`);
-      // Forward-confirmed check
+      const forwardChecks = [];
       for (const host of hostnames) {
         const fwd = await resolveDns(host, "A");
-        if (fwd && fwd.includes(ip)) {
-          lines.push(`   🟢 Forward-confirmed: ${host} → ${ip} ✓`);
-        } else {
-          lines.push(`   🟡 Forward mismatch: ${host} does not resolve back to ${ip}`);
-        }
+        forwardChecks.push({ hostname: host, forwardConfirmed: !!(fwd && fwd.includes(ip)) });
       }
+      result.lookups.push({ ip, hostnames, forwardChecks });
     } catch {
-      lines.push(`❌ **${ip}** → No reverse DNS (PTR) record found`);
+      result.lookups.push({ ip, hostnames: [], error: "No reverse DNS (PTR) record found" });
     }
   }
 
-  return lines.join("\n");
+  return result;
 }
 
 const PUBLIC_RESOLVERS = [
@@ -491,8 +357,7 @@ const PUBLIC_RESOLVERS = [
 
 async function dnsPropagation(domain, recordType = "A") {
   domain = cleanDomain(domain);
-  const lines = [`🌍 DNS Propagation Check for **${domain}** (${recordType})\n`];
-  const results = [];
+  const resolverResults = [];
 
   const queries = PUBLIC_RESOLVERS.map(async (r) => {
     const res = new dns.Resolver();
@@ -502,41 +367,29 @@ async function dnsPropagation(domain, recordType = "A") {
         const method = recordType === "AAAA" ? "resolve6" : "resolve4";
         res[method](domain, (err, addrs) => (err ? reject(err) : resolve(addrs)));
       });
-      return { ...r, records: records.sort(), status: "ok" };
+      return { resolver: r.name, ip: r.ip, records: records.sort(), status: "ok" };
     } catch {
-      return { ...r, records: [], status: "fail" };
+      return { resolver: r.name, ip: r.ip, records: [], status: "fail" };
     }
   });
 
   const all = await Promise.allSettled(queries);
   for (const a of all) {
-    if (a.status === "fulfilled") results.push(a.value);
+    if (a.status === "fulfilled") resolverResults.push(a.value);
   }
 
-  // Table
-  const pad = (s, n) => String(s).padEnd(n);
-  lines.push(`${pad("Resolver", 28)} │ ${pad("Result", 40)} │ Status`);
-  lines.push(`${"─".repeat(28)}─┼─${"─".repeat(40)}─┼─${"─".repeat(8)}`);
-
   const answerSets = new Set();
-  for (const r of results) {
-    const ip = r.records.length > 0 ? r.records.join(", ") : "(no response)";
-    const icon = r.status === "ok" ? "✅" : "❌";
-    lines.push(`${pad(`${r.name} (${r.ip})`, 28)} │ ${pad(ip, 40)} │ ${icon}`);
+  for (const r of resolverResults) {
     if (r.records.length > 0) answerSets.add(r.records.join(","));
   }
 
-  lines.push("");
-  const okCount = results.filter((r) => r.status === "ok").length;
-  if (okCount === 0) {
-    lines.push(`❌ **NOT PROPAGATED** — no resolver returned results`);
-  } else if (answerSets.size === 1) {
-    lines.push(`✅ **FULLY PROPAGATED** — all ${okCount} resolvers return the same answer`);
-  } else {
-    lines.push(`⚠️ **PARTIALLY PROPAGATED** — ${answerSets.size} different answers across ${okCount} resolvers`);
-  }
+  const okCount = resolverResults.filter((r) => r.status === "ok").length;
+  let propagationStatus;
+  if (okCount === 0) propagationStatus = "NOT_PROPAGATED";
+  else if (answerSets.size === 1) propagationStatus = "FULLY_PROPAGATED";
+  else propagationStatus = "PARTIALLY_PROPAGATED";
 
-  return lines.join("\n");
+  return { domain, recordType, resolvers: resolverResults, propagationStatus, respondingCount: okCount, uniqueAnswers: answerSets.size };
 }
 
 const SUBDOMAIN_PREFIXES = [
@@ -568,10 +421,7 @@ const SUBDOMAIN_CATEGORIES = {
 
 async function subdomainFinder(domain) {
   domain = cleanDomain(domain);
-  const lines = [`🔍 Subdomain Discovery: **${domain}**\n`];
   const unique = [...new Set(SUBDOMAIN_PREFIXES)];
-  lines.push(`Checking ${unique.length} common prefixes…\n`);
-
   const found = [];
   const CONCURRENCY = 10;
 
@@ -589,38 +439,18 @@ async function subdomainFinder(domain) {
     }
   }
 
-  if (found.length === 0) {
-    lines.push(`❌ No common subdomains found for ${domain}`);
-    return lines.join("\n");
-  }
-
-  lines.push(`✅ Found **${found.length}** subdomains:\n`);
-
-  const foundPrefixes = new Set(found.map((f) => f.prefix));
-
-  for (const [category, prefixes] of Object.entries(SUBDOMAIN_CATEGORIES)) {
-    const matching = found.filter((f) => prefixes.includes(f.prefix));
-    if (matching.length === 0) continue;
-    lines.push(`${category}:`);
-    for (const m of matching) {
-      lines.push(`   ${m.subdomain.padEnd(35)} → ${m.ips.join(", ")}`);
-    }
-    lines.push("");
-  }
-
-  // Any uncategorized
+  // Categorize
+  const categorized = {};
   const allCategorized = new Set(Object.values(SUBDOMAIN_CATEGORIES).flat());
-  const uncategorized = found.filter((f) => !allCategorized.has(f.prefix));
-  if (uncategorized.length > 0) {
-    lines.push(`📌 Other:`);
-    for (const m of uncategorized) {
-      lines.push(`   ${m.subdomain.padEnd(35)} → ${m.ips.join(", ")}`);
-    }
-    lines.push("");
+  for (const [category, prefixes] of Object.entries(SUBDOMAIN_CATEGORIES)) {
+    const catName = category.replace(/^[^\w]+\s*/, ""); // strip emoji prefix
+    const matching = found.filter((f) => prefixes.includes(f.prefix));
+    if (matching.length > 0) categorized[catName] = matching.map((m) => ({ subdomain: m.subdomain, ips: m.ips }));
   }
+  const uncategorized = found.filter((f) => !allCategorized.has(f.prefix));
+  if (uncategorized.length > 0) categorized["Other"] = uncategorized.map((m) => ({ subdomain: m.subdomain, ips: m.ips }));
 
-  lines.push(`📊 ${found.length}/${unique.length} subdomains found`);
-  return lines.join("\n");
+  return { domain, prefixesChecked: unique.length, found: found.length, subdomains: found.map((f) => ({ subdomain: f.subdomain, ips: f.ips })), categories: categorized };
 }
 
 const CRITICAL_HEADERS = [
@@ -642,7 +472,7 @@ const IMPORTANT_HEADERS = [
 async function httpHeadersCheck(domain) {
   domain = cleanDomain(domain);
   const url = `https://${domain}`;
-  const lines = [`🛡️ HTTP Security Headers Audit: **${domain}**\n`];
+  const result = { domain, error: null, score: 0, maxScore: 0, grade: "F", critical: [], important: [], leakage: {} };
 
   let res;
   try {
@@ -655,99 +485,50 @@ async function httpHeadersCheck(domain) {
     });
     clearTimeout(timer);
   } catch (err) {
-    lines.push(`❌ Could not connect to ${url}: ${err.message}`);
-    return lines.join("\n");
+    result.error = `Could not connect to ${url}: ${err.message}`;
+    return result;
   }
 
-  let score = 0;
-  const maxScore = CRITICAL_HEADERS.reduce((s, h) => s + h.points, 0) + IMPORTANT_HEADERS.reduce((s, h) => s + h.points, 0);
+  result.maxScore = CRITICAL_HEADERS.reduce((s, h) => s + h.points, 0) + IMPORTANT_HEADERS.reduce((s, h) => s + h.points, 0);
 
-  const checkHeader = (header, hdrs) => {
-    const val = hdrs.get(header.name.toLowerCase());
-    if (val) {
-      score += header.points;
-      return { present: true, value: val };
-    }
-    return { present: false };
-  };
-
-  lines.push(`**CRITICAL HEADERS:**`);
   for (const h of CRITICAL_HEADERS) {
-    const result = checkHeader(h, res.headers);
-    if (result.present) {
-      lines.push(`✅ **${h.name}:** ${result.value}`);
-    } else {
-      lines.push(`❌ **${h.name}:** MISSING`);
-      lines.push(`   💡 ${h.tip}`);
-    }
+    const val = res.headers.get(h.name.toLowerCase());
+    if (val) { result.score += h.points; result.critical.push({ header: h.name, present: true, value: val }); }
+    else { result.critical.push({ header: h.name, present: false, tip: h.tip }); }
   }
 
-  lines.push(`\n**IMPORTANT HEADERS:**`);
   for (const h of IMPORTANT_HEADERS) {
-    const result = checkHeader(h, res.headers);
-    if (result.present) {
-      lines.push(`✅ **${h.name}:** ${result.value}`);
-    } else {
-      lines.push(`❌ **${h.name}:** MISSING`);
-      lines.push(`   💡 ${h.tip}`);
-    }
+    const val = res.headers.get(h.name.toLowerCase());
+    if (val) { result.score += h.points; result.important.push({ header: h.name, present: true, value: val }); }
+    else { result.important.push({ header: h.name, present: false, tip: h.tip }); }
   }
 
-  // Information leakage
-  lines.push(`\n**INFORMATION LEAKAGE:**`);
   const server = res.headers.get("server");
-  if (server) {
-    const hasVersion = /\/[\d.]+/.test(server);
-    if (hasVersion) {
-      lines.push(`⚠️ **Server:** ${server} — reveals version number!`);
-      lines.push(`   💡 Remove version from Server header`);
-    } else {
-      lines.push(`ℹ️ **Server:** ${server}`);
-    }
-  } else {
-    lines.push(`✅ **Server:** Not disclosed`);
-  }
-
+  result.leakage.server = server ? { disclosed: true, value: server, exposesVersion: /\/[\d.]+/.test(server) } : { disclosed: false };
   const powered = res.headers.get("x-powered-by");
-  if (powered) {
-    lines.push(`⚠️ **X-Powered-By:** ${powered} — reveals framework!`);
-    lines.push(`   💡 Remove X-Powered-By header`);
-  } else {
-    lines.push(`✅ **X-Powered-By:** Not disclosed`);
-  }
+  result.leakage.xPoweredBy = powered ? { disclosed: true, value: powered } : { disclosed: false };
 
-  // Grade
-  lines.push("");
-  let grade, emoji;
-  if (score >= 12) { grade = "A"; emoji = "🟢"; }
-  else if (score >= 9) { grade = "B"; emoji = "🟢"; }
-  else if (score >= 6) { grade = "C"; emoji = "🟡"; }
-  else if (score >= 3) { grade = "D"; emoji = "🟡"; }
-  else { grade = "F"; emoji = "🔴"; }
+  if (result.score >= 12) result.grade = "A";
+  else if (result.score >= 9) result.grade = "B";
+  else if (result.score >= 6) result.grade = "C";
+  else if (result.score >= 3) result.grade = "D";
+  else result.grade = "F";
 
-  lines.push(`══════════════════════════════════════════════`);
-  lines.push(`📊 Security Headers Score: ${score}/${maxScore}`);
-  lines.push(`🏆 Grade: **${grade}** ${emoji}`);
-  lines.push(`══════════════════════════════════════════════`);
-
-  return lines.join("\n");
+  return result;
 }
 
 async function redirectChain(inputUrl, maxRedirects = 10) {
   let url = inputUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
-  const lines = [`🔀 Redirect Chain: **${url}**\n`];
 
   const hops = [];
   let current = url;
   const visited = new Set();
   const startTime = Date.now();
+  let loopDetected = false;
 
   for (let i = 0; i < maxRedirects; i++) {
-    if (visited.has(current)) {
-      lines.push(`❌ **Redirect loop detected** at ${current}`);
-      break;
-    }
+    if (visited.has(current)) { loopDetected = true; break; }
     visited.add(current);
 
     try {
@@ -764,7 +545,6 @@ async function redirectChain(inputUrl, maxRedirects = 10) {
       hops.push({ url: current, status: res.status, statusText: res.statusText, location });
 
       if (res.status >= 300 && res.status < 400 && location) {
-        // Resolve relative URLs
         current = location.startsWith("http") ? location : new URL(location, current).href;
       } else {
         break;
@@ -775,42 +555,16 @@ async function redirectChain(inputUrl, maxRedirects = 10) {
     }
   }
 
-  const totalTime = Date.now() - startTime;
-
-  for (let i = 0; i < hops.length; i++) {
-    const h = hops[i];
-    lines.push(`**Hop ${i + 1}:** ${h.url}`);
-    if (h.status >= 300 && h.status < 400) {
-      lines.push(`   → ${h.status} ${h.statusText}`);
-      lines.push(`   → Location: ${h.location}`);
-    } else if (h.status >= 200 && h.status < 300) {
-      lines.push(`   → ${h.status} ${h.statusText} ✅ (Final Destination)`);
-    } else {
-      lines.push(`   → ${h.status} ${h.statusText}`);
-    }
-    lines.push("");
-  }
-
-  lines.push(`══════════════════════════════════════════════`);
-  lines.push(`Total Hops: ${hops.length}`);
-
-  // Detect patterns
+  const totalTimeMs = Date.now() - startTime;
   const urls = hops.map((h) => h.url);
   const hasHttpToHttps = urls.some((u, i) => u.startsWith("http://") && i + 1 < urls.length && (hops[i].location || "").startsWith("https://"));
   const hasWwwRedirect = urls.some((u, i) => {
     const loc = hops[i].location || "";
     return (!u.includes("://www.") && loc.includes("://www.")) || (u.includes("://www.") && !loc.includes("://www."));
   });
+  const final = hops.length > 0 ? (hops[hops.length - 1].location || hops[hops.length - 1].url) : url;
 
-  if (hasHttpToHttps) lines.push(`✅ HTTP→HTTPS upgrade detected (good!)`);
-  if (hasWwwRedirect) lines.push(`ℹ️ www redirect detected`);
-
-  const final = hops[hops.length - 1];
-  lines.push(`Final URL: ${final.location || final.url}`);
-  lines.push(`Total Time: ${totalTime}ms`);
-  lines.push(`══════════════════════════════════════════════`);
-
-  return lines.join("\n");
+  return { inputUrl: url, hops, totalHops: hops.length, finalUrl: final, totalTimeMs, loopDetected, httpToHttps: hasHttpToHttps, wwwRedirect: hasWwwRedirect };
 }
 
 const TECH_SIGNATURES = {
@@ -885,7 +639,7 @@ const TECH_SIGNATURES = {
 async function techStackDetect(domain) {
   domain = cleanDomain(domain);
   const url = `https://${domain}`;
-  const lines = [`🖥️ Tech Stack Detection: **${domain}**\n`];
+  const result = { domain, error: null, technologies: {} };
 
   let res, body;
   try {
@@ -899,95 +653,71 @@ async function techStackDetect(domain) {
     clearTimeout(timer);
     body = await res.text();
   } catch (err) {
-    lines.push(`❌ Could not fetch ${url}: ${err.message}`);
-    return lines.join("\n");
+    result.error = `Could not fetch ${url}: ${err.message}`;
+    return result;
   }
 
   const detected = {
-    "🌐 CDN/Proxy": new Set(),
-    "🖥️ Web Server": new Set(),
-    "⚡ Framework": new Set(),
-    "📝 CMS": new Set(),
-    "🎨 CSS Framework": new Set(),
-    "📊 Analytics": new Set(),
-    "💬 Live Chat": new Set(),
-    "☁️ Hosting": new Set(),
+    cdn: new Set(),
+    webServer: new Set(),
+    framework: new Set(),
+    cms: new Set(),
+    cssFramework: new Set(),
+    analytics: new Set(),
+    liveChat: new Set(),
+    hosting: new Set(),
   };
 
-  // Check headers for CDN/hosting signatures
   for (const [header, tech] of Object.entries(TECH_SIGNATURES.headers)) {
     if (res.headers.get(header)) {
-      if (["Cloudflare", "Amazon CloudFront", "Fastly"].includes(tech)) {
-        detected["🌐 CDN/Proxy"].add(tech);
-      } else {
-        detected["☁️ Hosting"].add(tech);
-      }
+      if (["Cloudflare", "Amazon CloudFront", "Fastly"].includes(tech)) detected.cdn.add(tech);
+      else detected.hosting.add(tech);
     }
   }
 
-  // Server header
   const serverHeader = res.headers.get("server") || "";
   for (const sig of TECH_SIGNATURES.serverValues) {
-    if (sig.pattern.test(serverHeader)) detected["🖥️ Web Server"].add(sig.tech);
+    if (sig.pattern.test(serverHeader)) detected.webServer.add(sig.tech);
   }
 
-  // X-Powered-By
   const powered = res.headers.get("x-powered-by") || "";
-  if (/express/i.test(powered)) detected["⚡ Framework"].add("Express.js (Node.js)");
-  if (/php/i.test(powered)) detected["⚡ Framework"].add("PHP");
-  if (/asp\.net/i.test(powered)) detected["⚡ Framework"].add("ASP.NET");
+  if (/express/i.test(powered)) detected.framework.add("Express.js (Node.js)");
+  if (/php/i.test(powered)) detected.framework.add("PHP");
+  if (/asp\.net/i.test(powered)) detected.framework.add("ASP.NET");
 
-  // Meta generator
   const genMatch = body.match(/<meta[^>]*name=["']generator["'][^>]*content=["']([^"']+)["']/i);
   if (genMatch) {
     for (const sig of TECH_SIGNATURES.metaGenerator) {
-      if (sig.pattern.test(genMatch[1])) detected["📝 CMS"].add(sig.tech);
+      if (sig.pattern.test(genMatch[1])) detected.cms.add(sig.tech);
     }
   }
 
-  // HTML body patterns
   for (const sig of TECH_SIGNATURES.htmlPatterns) {
     if (sig.pattern.test(body)) {
-      const catMap = {
-        framework: "⚡ Framework",
-        cms: "📝 CMS",
-        css: "🎨 CSS Framework",
-        analytics: "📊 Analytics",
-        chat: "💬 Live Chat",
-      };
-      const cat = catMap[sig.category] || "⚡ Framework";
+      const catMap = { framework: "framework", cms: "cms", css: "cssFramework", analytics: "analytics", chat: "liveChat" };
+      const cat = catMap[sig.category] || "framework";
       detected[cat].add(sig.tech);
     }
   }
 
-  // Output
-  let anyDetected = false;
-  for (const [category, techs] of Object.entries(detected)) {
-    if (techs.size > 0) {
-      anyDetected = true;
-      lines.push(`${category}: ${[...techs].join(", ")}`);
-    }
+  for (const [cat, techs] of Object.entries(detected)) {
+    if (techs.size > 0) result.technologies[cat] = [...techs];
   }
 
-  if (!anyDetected) {
-    lines.push(`ℹ️ No technologies confidently detected`);
-  }
-
-  // Raw key headers
-  lines.push(`\n📋 **Raw Headers:**`);
+  // Raw headers of interest
+  result.rawHeaders = {};
   const interestingHeaders = ["server", "x-powered-by", "via", "cf-ray", "x-cache", "x-vercel-id", "x-amz-cf-id"];
   for (const h of interestingHeaders) {
     const val = res.headers.get(h);
-    if (val) lines.push(`   ${h}: ${val}`);
+    if (val) result.rawHeaders[h] = val;
   }
 
-  lines.push(`\n══════════════════════════════════════════════`);
-  return lines.join("\n");
+  return result;
 }
 
 async function domainAge(domain) {
   domain = cleanDomain(domain);
-  const lines = [`📅 Domain Age: **${domain}**\n`];
+  const result = { domain, error: null };
 
   try {
     const rec = await whoisWithRetry(domain);
@@ -996,133 +726,72 @@ async function domainAge(domain) {
     const expiryRaw = rec.registrarRegistrationExpirationDate || rec.expirationDate || rec.expiryDate || rec.expires || rec.ExpirationDate || null;
 
     if (!createdRaw) {
-      lines.push(`❌ Could not determine creation date for ${domain}`);
-      return lines.join("\n");
+      result.error = `Could not determine creation date for ${domain}`;
+      return result;
     }
 
     const created = new Date(createdRaw);
     const now = new Date();
 
-    // Calculate exact age
     let years = now.getFullYear() - created.getFullYear();
     let months = now.getMonth() - created.getMonth();
     let days = now.getDate() - created.getDate();
     if (days < 0) { months--; days += 30; }
     if (months < 0) { years--; months += 12; }
 
-    // Timeline
-    lines.push(`📆 **Registration Timeline:**`);
-    lines.push(`├── 🟢 **Created:**  ${created.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`);
-    if (updatedRaw) {
-      const updated = new Date(updatedRaw);
-      lines.push(`├── 🔄 **Updated:**  ${updated.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`);
-    }
-    lines.push(`├── 📍 **Current:**  ${now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`);
-    if (expiryRaw) {
-      const expiry = new Date(expiryRaw);
-      lines.push(`└── 🔴 **Expires:**  ${expiry.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`);
-    }
+    result.created = created.toISOString().split("T")[0];
+    result.updated = updatedRaw ? new Date(updatedRaw).toISOString().split("T")[0] : null;
+    result.expires = expiryRaw ? new Date(expiryRaw).toISOString().split("T")[0] : null;
+    result.age = { years, months, days };
+    result.ageDescription = `${years} years, ${months} months, ${days} days`;
 
-    lines.push("");
-    lines.push(`⏱️ **Age: ${years} years, ${months} months, ${days} days**`);
-
-    // Context
     const totalYears = years + months / 12;
-    let context;
-    if (totalYears < 1) context = "🆕 Very new domain — may have lower trust score";
-    else if (totalYears < 3) context = "📅 Relatively new domain";
-    else if (totalYears < 10) context = "✅ Established domain";
-    else if (totalYears < 20) context = "🏆 Well-established domain";
-    else context = "👴 Internet veteran!";
-    lines.push(context);
+    if (totalYears < 1) result.maturity = "very_new";
+    else if (totalYears < 3) result.maturity = "new";
+    else if (totalYears < 10) result.maturity = "established";
+    else if (totalYears < 20) result.maturity = "well_established";
+    else result.maturity = "veteran";
 
-    // Longevity bar if we have expiry
     if (expiryRaw) {
       const expiry = new Date(expiryRaw);
+      const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+      result.daysUntilExpiry = daysUntilExpiry;
       const totalSpan = expiry - created;
       const usedSpan = now - created;
-      const pct = Math.min(100, Math.max(0, Math.round((usedSpan / totalSpan) * 100)));
-      const filled = Math.round(pct / 100 * 30);
-      const bar = "█".repeat(filled) + "░".repeat(30 - filled);
-      const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-      lines.push("");
-      lines.push(`📊 **Domain Longevity:**`);
-      lines.push(`${bar} ${pct}% of registration used`);
-      if (daysUntilExpiry > 0) {
-        const ey = Math.floor(daysUntilExpiry / 365);
-        const em = Math.floor((daysUntilExpiry % 365) / 30);
-        lines.push(`${ey > 0 ? ey + " years, " : ""}${em} months until expiry`);
-      } else {
-        lines.push(`🔴 Domain has EXPIRED!`);
-      }
+      result.registrationUsedPercent = Math.min(100, Math.max(0, Math.round((usedSpan / totalSpan) * 100)));
     }
-
-    lines.push(`\n══════════════════════════════════════════════`);
   } catch (err) {
-    lines.push(`❌ Could not retrieve domain age: ${err.message}`);
+    result.error = err.message;
   }
 
-  return lines.join("\n");
+  return result;
 }
 
 async function dnsCompare(domain1, domain2) {
   domain1 = cleanDomain(domain1);
   domain2 = cleanDomain(domain2);
-  const lines = [`🔄 DNS Comparison: **${domain1}** vs **${domain2}**\n`];
 
   const types = ["A", "AAAA", "MX", "NS", "TXT"];
-
-  const pad = (s, n) => {
-    s = String(s);
-    return s.length > n ? s.slice(0, n - 1) + "…" : s.padEnd(n);
-  };
-
-  lines.push(`${pad("Record Type", 12)} │ ${pad(domain1, 30)} │ ${pad(domain2, 30)}`);
-  lines.push(`${"─".repeat(12)}─┼─${"─".repeat(30)}─┼─${"─".repeat(30)}`);
-
+  const comparison = [];
   const differences = [];
 
   for (const t of types) {
     const [r1, r2] = await Promise.all([resolveDns(domain1, t), resolveDns(domain2, t)]);
-
-    const format = (records) => {
-      if (!records || records.length === 0) return ["(none)"];
+    const fmt = (records) => {
+      if (!records || records.length === 0) return [];
       return records.map((r) => {
-        if (typeof r === "object" && r.exchange) return `${r.exchange} (${r.priority})`;
-        const s = Array.isArray(r) ? r.join("") : String(r);
-        return s.length > 28 ? s.slice(0, 25) + "…" : s;
+        if (typeof r === "object" && r.exchange) return `${r.exchange} (pri ${r.priority})`;
+        return Array.isArray(r) ? r.join("") : String(r);
       });
     };
-
-    const f1 = format(r1);
-    const f2 = format(r2);
-    const maxRows = Math.max(f1.length, f2.length);
-
-    for (let i = 0; i < maxRows; i++) {
-      const label = i === 0 ? pad(t, 12) : pad("", 12);
-      lines.push(`${label} │ ${pad(f1[i] || "", 30)} │ ${pad(f2[i] || "", 30)}`);
-    }
-    lines.push(`${"─".repeat(12)}─┼─${"─".repeat(30)}─┼─${"─".repeat(30)}`);
-
-    // Track differences
-    const s1 = JSON.stringify(r1 || []);
-    const s2 = JSON.stringify(r2 || []);
-    if (s1 !== s2) {
-      differences.push(t);
-    }
+    const f1 = fmt(r1);
+    const f2 = fmt(r2);
+    const match = JSON.stringify(r1 || []) === JSON.stringify(r2 || []);
+    if (!match) differences.push(t);
+    comparison.push({ type: t, [domain1]: f1, [domain2]: f2, match });
   }
 
-  lines.push("");
-  if (differences.length === 0) {
-    lines.push(`✅ Both domains have identical DNS configuration`);
-  } else {
-    lines.push(`**Key Differences:**`);
-    for (const t of differences) {
-      lines.push(`• ${t} records differ between the two domains`);
-    }
-  }
-
-  return lines.join("\n");
+  return { domain1, domain2, records: comparison, differences, identical: differences.length === 0 };
 }
 
 const PORT_SERVICES = {
@@ -1148,74 +817,41 @@ function checkPort(host, port, timeoutMs = 3000) {
 
 async function portCheck(domain, portsArg = "common") {
   domain = cleanDomain(domain);
-  const lines = [`🔌 Port Check: **${domain}**\n`];
 
   let ports;
   if (portsArg === "common") {
     ports = COMMON_PORTS;
   } else {
     ports = portsArg.split(",").map((p) => parseInt(p.trim(), 10)).filter((p) => p > 0 && p <= 65535);
-    if (ports.length === 0) {
-      lines.push(`❌ No valid ports specified`);
-      return lines.join("\n");
-    }
+    if (ports.length === 0) return { domain, error: "No valid ports specified" };
   }
 
-  // Resolve to IP for display
   const aRecs = await resolveDns(domain, "A");
   const ip = aRecs ? aRecs[0] : domain;
-  if (aRecs) lines.push(`Resolved to: ${ip}\n`);
 
   const startTime = Date.now();
   const results = await Promise.all(ports.map((p) => checkPort(ip, p)));
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  const scanTimeMs = Date.now() - startTime;
 
-  const pad = (s, n) => String(s).padEnd(n);
-  lines.push(`${pad("Port", 7)} │ ${pad("Service", 13)} │ Status`);
-  lines.push(`${"─".repeat(7)}─┼─${"─".repeat(13)}─┼─${"─".repeat(10)}`);
+  const portResults = results.map((r) => ({ port: r.port, service: PORT_SERVICES[r.port] || "Unknown", open: r.open }));
+  const openCount = results.filter((r) => r.open).length;
+  const openSet = new Set(results.filter((r) => r.open).map((r) => r.port));
 
-  let openCount = 0;
-  for (const r of results) {
-    const svc = PORT_SERVICES[r.port] || "Unknown";
-    const icon = r.open ? "✅ Open" : "❌ Closed";
-    if (r.open) openCount++;
-    lines.push(`${pad(r.port, 7)} │ ${pad(svc, 13)} │ ${icon}`);
-  }
-
-  lines.push("");
-  lines.push(`══════════════════════════════════════════════`);
-  lines.push(`📊 Results: ${openCount} open, ${results.length - openCount} closed out of ${results.length} ports checked`);
-  lines.push(`⏱️ Scan completed in ${elapsed}s`);
-
-  // Insights
-  const openPorts = new Set(results.filter((r) => r.open).map((r) => r.port));
-  if (openPorts.has(80) && openPorts.has(443)) lines.push(`\n✅ Web services: HTTP and HTTPS are both open (good!)`);
-  else if (openPorts.has(443) && !openPorts.has(80)) lines.push(`\n✅ HTTPS is open, HTTP closed (HTTPS-only — good!)`);
-  else if (openPorts.has(80) && !openPorts.has(443)) lines.push(`\n⚠️ HTTP is open but HTTPS is closed — add SSL!`);
-
+  const insights = [];
+  if (openSet.has(80) && openSet.has(443)) insights.push("HTTP and HTTPS both open");
+  else if (openSet.has(443) && !openSet.has(80)) insights.push("HTTPS-only (good)");
+  else if (openSet.has(80) && !openSet.has(443)) insights.push("HTTP open but no HTTPS - add SSL");
   const dbPorts = [3306, 5432];
-  const openDb = dbPorts.filter((p) => openPorts.has(p));
-  if (openDb.length > 0) lines.push(`🔴 Database port(s) exposed: ${openDb.join(", ")} — security risk!`);
-  else if (ports.some((p) => dbPorts.includes(p))) lines.push(`ℹ️ No database ports exposed (good security practice)`);
+  const openDb = dbPorts.filter((p) => openSet.has(p));
+  if (openDb.length > 0) insights.push(`Database ports exposed: ${openDb.join(", ")} - security risk`);
 
-  if (!openPorts.has(22) && ports.includes(22)) lines.push(`ℹ️ No SSH port detected (may be on non-standard port)`);
-
-  lines.push(`══════════════════════════════════════════════`);
-  return lines.join("\n");
+  return { domain, resolvedIp: ip, ports: portResults, openCount, closedCount: results.length - openCount, totalChecked: results.length, scanTimeMs, insights };
 }
 
 async function domainReport(domain) {
   domain = cleanDomain(domain);
   const startTime = Date.now();
-  const lines = [
-    `══════════════════════════════════════════════`,
-    `📊 COMPLETE DOMAIN INTELLIGENCE REPORT`,
-    `📌 Domain: **${domain}**`,
-    `🕐 Generated: ${new Date().toISOString()}`,
-    `══════════════════════════════════════════════\n`,
-  ];
 
-  // Run checks in parallel (exclude subdomain_finder — too slow, exclude dns_compare/dns_propagation — need extra params)
   const checks = await Promise.allSettled([
     dnsLookup(domain, "ALL"),
     whoisLookup(domain),
@@ -1227,72 +863,50 @@ async function domainReport(domain) {
     portCheck(domain, "80,443,22,21,25"),
   ]);
 
-  const labels = ["DNS Records", "WHOIS Registration", "Email Security", "SSL Certificate", "HTTP Security Headers", "Technology Stack", "Domain Age", "Port Scan"];
+  const get = (i) => checks[i].status === "fulfilled" ? checks[i].value : { error: checks[i].reason?.message || "Check failed" };
 
-  for (let i = 0; i < checks.length; i++) {
-    lines.push(`\n${"─".repeat(50)}`);
-    lines.push(`📑 ${labels[i]}`);
-    lines.push(`${"─".repeat(50)}`);
-    if (checks[i].status === "fulfilled") {
-      lines.push(checks[i].value);
-    } else {
-      lines.push(`❌ ${labels[i]} check failed: ${checks[i].reason?.message || "Unknown error"}`);
-    }
-  }
+  const dnsData = get(0);
+  const whoisData = get(1);
+  const emailData = get(2);
+  const sslData = get(3);
+  const headersData = get(4);
+  const techData = get(5);
+  const ageData = get(6);
+  const portData = get(7);
 
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  const elapsedMs = Date.now() - startTime;
 
-  // Quick summary
-  lines.push(`\n══════════════════════════════════════════════`);
-  lines.push(`📊 QUICK SUMMARY — ${domain}`);
-  lines.push(`══════════════════════════════════════════════`);
+  // Build summary
+  const dnsFound = dnsData.records ? Object.values(dnsData.records).filter((v) => v !== null).length : 0;
+  const techList = techData.technologies ? Object.values(techData.technologies).flat() : [];
 
-  // DNS summary
-  const dnsText = checks[0].status === "fulfilled" ? checks[0].value : "";
-  const dnsRecordCount = (dnsText.match(/✅/g) || []).length;
-  lines.push(`🌐 DNS:          ${dnsRecordCount > 0 ? `✅ Configured (${dnsRecordCount} record types found)` : "❌ No records"}`);
+  const summary = {
+    dns: dnsFound > 0 ? `Configured (${dnsFound} record types)` : "No records",
+    whois: whoisData.created ? `Registered since ${whoisData.created}` : (whoisData.error || "Limited data"),
+    email: emailData.grade ? `Grade ${emailData.grade} (${emailData.score}/${emailData.maxScore})` : "N/A",
+    ssl: sslData.status || sslData.error || "N/A",
+    headers: headersData.grade ? `Grade ${headersData.grade} (${headersData.score}/${headersData.maxScore})` : "N/A",
+    tech: techList.length > 0 ? techList.join(", ") : "None detected",
+    age: ageData.ageDescription || ageData.error || "N/A",
+    ports: portData.openCount !== undefined ? `${portData.openCount} open, ${portData.closedCount} closed` : "N/A",
+  };
 
-  // WHOIS summary
-  const whoisText = checks[1].status === "fulfilled" ? checks[1].value : "";
-  const createdMatch = whoisText.match(/Created:\*\*\s*(\S+)/);
-  const expiryDaysMatch = whoisText.match(/\((\d+) days remaining\)/);
-  if (createdMatch) {
-    lines.push(`🏢 Registration: ✅ Registered since ${createdMatch[1]}${expiryDaysMatch ? ` | Expires in ${expiryDaysMatch[1]} days` : ""}`);
-  } else {
-    lines.push(`🏢 Registration: ⚠️ WHOIS data limited`);
-  }
-
-  // Email summary
-  const emailText = checks[2].status === "fulfilled" ? checks[2].value : "";
-  const emailGrade = emailText.match(/Grade:\s*(\w)/);
-  const mxOk = emailText.includes("✅") && emailText.includes("MX");
-  lines.push(`📧 Email:        ${emailGrade ? `Grade ${emailGrade[1]}` : "N/A"}${mxOk ? " — MX ✅" : ""}`);
-
-  // SSL summary
-  const sslText = checks[3].status === "fulfilled" ? checks[3].value : "";
-  if (sslText.includes("🟢")) lines.push(`🔒 SSL:          ✅ Valid`);
-  else if (sslText.includes("🔴")) lines.push(`🔒 SSL:          🔴 Expired or invalid`);
-  else lines.push(`🔒 SSL:          ⚠️ Check failed`);
-
-  // Headers summary
-  const headersText = checks[4].status === "fulfilled" ? checks[4].value : "";
-  const headersGrade = headersText.match(/Grade:\s*\*\*(\w)\*\*/);
-  lines.push(`🛡️ Headers:      ${headersGrade ? `Grade ${headersGrade[1]}` : "N/A"}`);
-
-  // Tech summary
-  const techText = checks[5].status === "fulfilled" ? checks[5].value : "";
-  const techLines = techText.split("\n").filter((l) => l.match(/^[🌐🖥⚡📝🎨📊💬☁]/));
-  lines.push(`🖥️ Tech:         ${techLines.length > 0 ? techLines.map((l) => l.split(": ")[1]).filter(Boolean).join(" | ") : "N/A"}`);
-
-  // Age summary
-  const ageText = checks[6].status === "fulfilled" ? checks[6].value : "";
-  const ageMatch = ageText.match(/Age:\s*(.+)\*\*/);
-  lines.push(`📅 Age:          ${ageMatch ? ageMatch[1].replace(/\*\*/g, "") : "N/A"}`);
-
-  lines.push(`══════════════════════════════════════════════`);
-  lines.push(`⏱️ Report generated in ${elapsed}s`);
-
-  return lines.join("\n");
+  return {
+    domain,
+    generatedAt: new Date().toISOString(),
+    elapsedMs,
+    summary,
+    sections: {
+      dns: dnsData,
+      whois: whoisData,
+      email: emailData,
+      ssl: sslData,
+      httpHeaders: headersData,
+      techStack: techData,
+      domainAge: ageData,
+      ports: portData,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1485,8 +1099,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain to analyze (e.g. example.com)") },
     { title: "Domain Report", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await domainReport(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await domainReport(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1503,8 +1117,8 @@ function createMcpServer() {
     },
     { title: "DNS Lookup", readOnlyHint: true, openWorldHint: true },
     async ({ domain, record_type }) => {
-      const text = await dnsLookup(domain, record_type);
-      return { content: [{ type: "text", text }] };
+      const data = await dnsLookup(domain, record_type);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1515,8 +1129,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain name to look up (e.g. example.com)") },
     { title: "WHOIS Lookup", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await whoisLookup(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await whoisLookup(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1527,8 +1141,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain name to check (e.g. example.com)") },
     { title: "Domain Availability", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await domainAvailable(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await domainAvailable(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1539,8 +1153,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain name to audit (e.g. example.com)") },
     { title: "Email Security Audit", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await emailConfigCheck(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await emailConfigCheck(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1551,8 +1165,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain or hostname to check (e.g. example.com)") },
     { title: "SSL Certificate Check", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await sslCheck(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await sslCheck(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1563,8 +1177,8 @@ function createMcpServer() {
     { target: z.string().describe("IP address or domain name (e.g. 8.8.8.8 or example.com)") },
     { title: "Reverse DNS", readOnlyHint: true, openWorldHint: true },
     async ({ target }) => {
-      const text = await reverseDns(target);
-      return { content: [{ type: "text", text }] };
+      const data = await reverseDns(target);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1578,8 +1192,8 @@ function createMcpServer() {
     },
     { title: "DNS Propagation Check", readOnlyHint: true, openWorldHint: true },
     async ({ domain, record_type }) => {
-      const text = await dnsPropagation(domain, record_type);
-      return { content: [{ type: "text", text }] };
+      const data = await dnsPropagation(domain, record_type);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1590,8 +1204,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain to scan for subdomains (e.g. example.com)") },
     { title: "Subdomain Finder", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await subdomainFinder(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await subdomainFinder(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1602,8 +1216,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain or URL to check (e.g. example.com)") },
     { title: "HTTP Security Headers", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await httpHeadersCheck(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await httpHeadersCheck(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1617,8 +1231,8 @@ function createMcpServer() {
     },
     { title: "Redirect Chain Tracer", readOnlyHint: true, openWorldHint: true },
     async ({ url, max_redirects }) => {
-      const text = await redirectChain(url, max_redirects);
-      return { content: [{ type: "text", text }] };
+      const data = await redirectChain(url, max_redirects);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1629,8 +1243,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain to analyze (e.g. example.com)") },
     { title: "Tech Stack Detector", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await techStackDetect(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await techStackDetect(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1641,8 +1255,8 @@ function createMcpServer() {
     { domain: z.string().describe("Domain to check age of (e.g. example.com)") },
     { title: "Domain Age Calculator", readOnlyHint: true, openWorldHint: true },
     async ({ domain }) => {
-      const text = await domainAge(domain);
-      return { content: [{ type: "text", text }] };
+      const data = await domainAge(domain);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1656,8 +1270,8 @@ function createMcpServer() {
     },
     { title: "DNS Comparison", readOnlyHint: true, openWorldHint: true },
     async ({ domain1, domain2 }) => {
-      const text = await dnsCompare(domain1, domain2);
-      return { content: [{ type: "text", text }] };
+      const data = await dnsCompare(domain1, domain2);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1671,8 +1285,8 @@ function createMcpServer() {
     },
     { title: "Port Scanner", readOnlyHint: true, openWorldHint: true },
     async ({ domain, ports }) => {
-      const text = await portCheck(domain, ports);
-      return { content: [{ type: "text", text }] };
+      const data = await portCheck(domain, ports);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
 
@@ -1872,6 +1486,54 @@ app.delete("/mcp", async (req, res) => {
   const transport = sessions.get(sessionId);
   await transport.handleRequest(req, res);
   sessions.delete(sessionId);
+});
+
+// ---------------------------------------------------------------------------
+// Simple REST API — no MCP handshake needed, just GET with ?domain=
+// ---------------------------------------------------------------------------
+
+const TOOL_MAP = {
+  "domain-report": (q) => domainReport(q.domain),
+  "dns-lookup": (q) => dnsLookup(q.domain, q.record_type || "ALL"),
+  "whois": (q) => whoisLookup(q.domain),
+  "domain-available": (q) => domainAvailable(q.domain),
+  "email-security": (q) => emailConfigCheck(q.domain),
+  "ssl": (q) => sslCheck(q.domain),
+  "reverse-dns": (q) => reverseDns(q.target || q.domain),
+  "dns-propagation": (q) => dnsPropagation(q.domain, q.record_type || "A"),
+  "subdomains": (q) => subdomainFinder(q.domain),
+  "http-headers": (q) => httpHeadersCheck(q.domain),
+  "redirect-chain": (q) => redirectChain(q.url || `https://${q.domain}`, parseInt(q.max_redirects) || 10),
+  "tech-stack": (q) => techStackDetect(q.domain),
+  "domain-age": (q) => domainAge(q.domain),
+  "dns-compare": (q) => dnsCompare(q.domain1, q.domain2),
+  "port-check": (q) => portCheck(q.domain, q.ports || "common"),
+};
+
+app.get("/api/:tool", async (req, res) => {
+  const tool = TOOL_MAP[req.params.tool];
+  if (!tool) return res.status(404).json({ error: `Unknown tool: ${req.params.tool}`, availableTools: Object.keys(TOOL_MAP) });
+  const needsDomain = !["redirect-chain", "reverse-dns", "dns-compare"].includes(req.params.tool);
+  if (needsDomain && !req.query.domain) return res.status(400).json({ error: "Missing required query parameter: domain", example: `/api/${req.params.tool}?domain=example.com` });
+  if (req.params.tool === "dns-compare" && (!req.query.domain1 || !req.query.domain2)) return res.status(400).json({ error: "Missing required query parameters: domain1, domain2" });
+  try {
+    const data = await tool(req.query);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- API index ---
+app.get("/api", (_req, res) => {
+  res.json({
+    description: "Domain Inspector REST API. Use any tool via simple GET requests.",
+    baseUrl: "https://mcpdns.onrender.com/api",
+    tools: Object.keys(TOOL_MAP).map((name) => ({
+      endpoint: `/api/${name}`,
+      example: name === "dns-compare" ? `/api/${name}?domain1=google.com&domain2=bing.com` : `/api/${name}?domain=example.com`,
+    })),
+  });
 });
 
 // --- Well-known server card ---
