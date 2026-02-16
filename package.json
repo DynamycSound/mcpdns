@@ -1,0 +1,33 @@
+{
+  "name": "mcp-domain-lookup",
+  "version": "2.0.0",
+  "description": "The most comprehensive domain intelligence MCP server. 15 tools: DNS, WHOIS, domain availability, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "mcp",
+    "dns",
+    "whois",
+    "domain",
+    "ssl",
+    "email",
+    "model-context-protocol",
+    "security-headers",
+    "tech-stack",
+    "subdomain",
+    "port-scan",
+    "reverse-dns",
+    "redirect",
+    "smithery"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^4.21.2",
+    "whois-json": "^2.0.4"
+  }
+}
