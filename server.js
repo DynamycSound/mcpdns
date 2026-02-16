@@ -1,4 +1,7 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import dns from "dns";
 import tls from "tls";
@@ -1699,7 +1702,6 @@ function createMcpServer() {
           description: SERVER_CARD.description,
           toolCount: SERVER_CARD.tools.length,
           homepage: "https://mcpdns.onrender.com",
-          repository: "https://github.com/DynamycSound/mcpdns",
         }, null, 2),
       }],
     })
@@ -1709,162 +1711,12 @@ function createMcpServer() {
 }
 
 // ---------------------------------------------------------------------------
-// About page HTML
+// Homepage HTML (loaded from file)
 // ---------------------------------------------------------------------------
 
-const HOMEPAGE_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Domain Inspector — MCP Domain Intelligence Server</title>
-<meta name="description" content="15 domain intelligence tools for AI agents. DNS, WHOIS, SSL, email security, tech stack detection, and more via the Model Context Protocol.">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0a0a0f;--surface:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);--glass:rgba(255,255,255,.06);--text:#e4e4e7;--muted:#71717a;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--radius:16px}
-body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;min-height:100vh}
-body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse at 30% 20%,rgba(99,102,241,.08) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(34,197,94,.05) 0%,transparent 50%);pointer-events:none;z-index:0}
-.wrap{max-width:900px;margin:0 auto;padding:2rem 1.5rem;position:relative;z-index:1}
-header{text-align:center;padding:4rem 0 3rem}
-.logo{display:inline-flex;align-items:center;gap:.75rem;margin-bottom:1.5rem}
-.logo svg{width:48px;height:48px}
-.logo-text{font-size:1.75rem;font-weight:700;letter-spacing:-.02em}
-.badge{display:inline-flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-bottom:1.5rem}
-.badge span{font-size:.75rem;padding:4px 12px;border-radius:99px;border:1px solid var(--border);color:var(--muted);background:var(--surface)}
-.badge .live{color:var(--green);border-color:rgba(34,197,94,.3)}
-p.hero{color:var(--muted);font-size:1.05rem;max-width:600px;margin:0 auto 2rem;line-height:1.8}
-.glass{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:2rem;margin-bottom:2rem}
-h2{font-size:1.15rem;font-weight:600;margin-bottom:1.25rem;color:#fff;display:flex;align-items:center;gap:.5rem}
-h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
-.tools-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
-.tool{padding:.6rem .8rem;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid transparent;transition:border-color .2s}
-.tool:hover{border-color:var(--border)}
-.tool code{font-size:.8rem;font-weight:600;color:var(--accent2);display:block;margin-bottom:2px}
-.tool span{font-size:.75rem;color:var(--muted)}
-.features{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem}
-.feat{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;text-align:center}
-.feat .num{font-size:2rem;font-weight:700;color:var(--accent2);display:block;margin-bottom:.25rem}
-.feat .label{font-size:.85rem;color:var(--muted)}
-pre.code-block{background:rgba(0,0,0,.5);border:1px solid var(--border);border-radius:12px;padding:1.25rem;overflow-x:auto;font-size:.85rem;color:#a5b4fc;line-height:1.6;margin:1rem 0}
-.faq{margin-top:.5rem}
-.faq details{border-bottom:1px solid var(--border);padding:1rem 0}
-.faq details:last-child{border-bottom:none}
-.faq summary{cursor:pointer;font-weight:500;font-size:.95rem;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center}
-.faq summary::after{content:'+';font-size:1.2rem;color:var(--muted);transition:transform .2s}
-.faq details[open] summary::after{transform:rotate(45deg)}
-.faq .answer{padding-top:.75rem;font-size:.9rem;color:var(--muted);line-height:1.7}
-.clients{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem}
-.clients span{font-size:.8rem;padding:6px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
-footer{text-align:center;padding:3rem 0 2rem;font-size:.8rem;color:var(--muted);border-top:1px solid var(--border);margin-top:2rem}
-footer a{color:var(--accent2);text-decoration:none}
-footer a:hover{text-decoration:underline}
-@media(max-width:700px){.tools-grid{grid-template-columns:repeat(2,1fr)}.features{grid-template-columns:1fr}}
-@media(max-width:480px){.tools-grid{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<div class="wrap">
-<header>
-<div class="logo">
-<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity=".3"/><circle cx="24" cy="24" r="15" stroke="#818cf8" stroke-width="2"/><circle cx="24" cy="24" r="4" fill="#818cf8"/><line x1="24" y1="2" x2="24" y2="46" stroke="#6366f1" stroke-width="1" opacity=".3"/><ellipse cx="24" cy="24" rx="10" ry="22" stroke="#6366f1" stroke-width="1" opacity=".3"/></svg>
-<span class="logo-text">Domain Inspector</span>
-</div>
-<div class="badge">
-<span class="live">Live</span>
-<span>v2.0.0</span>
-<span>15 Tools</span>
-<span>MCP Server</span>
-<span>Free &amp; Open Source</span>
-</div>
-<p class="hero">Domain intelligence for AI agents. DNS records, WHOIS, SSL certificates, email security, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more &mdash; all through the Model Context Protocol.</p>
-</header>
-
-<div class="features">
-<div class="feat"><span class="num">15</span><span class="label">Intelligence Tools</span></div>
-<div class="feat"><span class="num">4</span><span class="label">Prompt Templates</span></div>
-<div class="feat"><span class="num">&lt;3s</span><span class="label">Avg Response</span></div>
-</div>
-
-<div class="glass">
-<h2><span class="dot"></span>Tools</h2>
-<div class="tools-grid">
-<div class="tool"><code>domain_report</code><span>Full intelligence report</span></div>
-<div class="tool"><code>dns_lookup</code><span>A/AAAA/MX/TXT/NS/CNAME</span></div>
-<div class="tool"><code>whois_lookup</code><span>Registration &amp; expiry</span></div>
-<div class="tool"><code>domain_available</code><span>Availability check</span></div>
-<div class="tool"><code>email_config_check</code><span>SPF/DKIM/DMARC audit</span></div>
-<div class="tool"><code>ssl_check</code><span>Certificate details</span></div>
-<div class="tool"><code>reverse_dns</code><span>IP to hostname</span></div>
-<div class="tool"><code>dns_propagation</code><span>8 global resolvers</span></div>
-<div class="tool"><code>subdomain_finder</code><span>~80 common prefixes</span></div>
-<div class="tool"><code>http_headers_check</code><span>Security grade A&ndash;F</span></div>
-<div class="tool"><code>redirect_chain</code><span>Full redirect path</span></div>
-<div class="tool"><code>tech_stack_detect</code><span>Server/CDN/framework</span></div>
-<div class="tool"><code>domain_age</code><span>Exact age &amp; timeline</span></div>
-<div class="tool"><code>dns_compare</code><span>Side-by-side comparison</span></div>
-<div class="tool"><code>port_check</code><span>Common port scan</span></div>
-</div>
-</div>
-
-<div class="glass">
-<h2><span class="dot"></span>Connect</h2>
-<p style="font-size:.9rem;color:var(--muted);margin-bottom:.75rem">Add to your MCP client configuration:</p>
-<pre class="code-block">{
-  "mcpServers": {
-    "domain-lookup": {
-      "url": "https://mcpdns.onrender.com/mcp"
-    }
-  }
-}</pre>
-<p style="font-size:.85rem;color:var(--muted);margin-top:.75rem">Compatible with:</p>
-<div class="clients">
-<span>Claude Desktop</span>
-<span>Cursor</span>
-<span>Windsurf</span>
-<span>VS Code</span>
-<span>Cline</span>
-<span>Any MCP Client</span>
-</div>
-</div>
-
-<div class="glass">
-<h2><span class="dot"></span>Quick Start</h2>
-<p style="font-size:.9rem;color:var(--muted);margin-bottom:.75rem">Once connected, just ask your AI assistant:</p>
-<pre class="code-block">"Run a domain report for stripe.com"
-"Check the SSL certificate for github.com"
-"Audit the security of my-company.com"
-"Find subdomains of google.com"
-"Compare DNS records of google.com and bing.com"</pre>
-</div>
-
-<div class="glass">
-<h2><span class="dot"></span>Frequently Asked Questions</h2>
-<div class="faq">
-<details><summary>What is this?<span></span></summary><div class="answer">Domain Inspector is an MCP (Model Context Protocol) server that gives AI assistants the ability to perform domain intelligence lookups. It provides 15 tools covering DNS, WHOIS, SSL, email security, HTTP headers, tech stack detection, subdomain discovery, and port scanning.</div></details>
-<details><summary>How do I use it?<span></span></summary><div class="answer">Add the server URL to your MCP client configuration (Claude Desktop, Cursor, Windsurf, VS Code, etc.), then ask your AI assistant to analyze any domain. The assistant will automatically use the appropriate tools.</div></details>
-<details><summary>Is it free?<span></span></summary><div class="answer">Yes. Domain Inspector is completely free and open source under the MIT license. There are no API keys, rate limits, or paid tiers.</div></details>
-<details><summary>What data sources does it use?<span></span></summary><div class="answer">All data comes from public sources: DNS protocol queries, public WHOIS registries, SSL/TLS certificate inspection, HTTP response headers, and standard network protocols. No private databases or paid APIs are used.</div></details>
-<details><summary>Is it safe to use?<span></span></summary><div class="answer">Yes. All tools are read-only and only query publicly available data. DNS lookups, WHOIS queries, and SSL checks are standard operations that every web browser performs. Subdomain scanning and port checking use conservative limits and timeouts.</div></details>
-<details><summary>What is MCP?<span></span></summary><div class="answer">The Model Context Protocol (MCP) is an open standard by Anthropic that allows AI assistants to connect to external tools and data sources. It enables AI models to take actions and access real-time information through a standardized interface.</div></details>
-<details><summary>Can I self-host it?<span></span></summary><div class="answer">Yes. Clone the repository, run <code>npm install</code>, then <code>node server.js</code>. The server runs on port 3000 by default. You can deploy it to any Node.js hosting provider (Render, Railway, Fly.io, etc.).</div></details>
-</div>
-</div>
-
-<div class="glass">
-<h2><span class="dot"></span>API Endpoints</h2>
-<div class="tools-grid" style="grid-template-columns:1fr 1fr">
-<div class="tool"><code>POST /mcp</code><span>MCP JSON-RPC endpoint</span></div>
-<div class="tool"><code>GET /health</code><span>Health check</span></div>
-<div class="tool"><code>GET /.well-known/mcp/server-card.json</code><span>Server metadata</span></div>
-<div class="tool"><code>GET /</code><span>Server info (JSON)</span></div>
-</div>
-</div>
-
-<footer>
-Domain Inspector &middot; <a href="https://github.com/DynamycSound/mcpdns">GitHub</a> &middot; <a href="https://modelcontextprotocol.io">MCP Protocol</a> &middot; MIT License
-</footer>
-</div>
-</body>
-</html>`;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const HOMEPAGE_HTML = fs.readFileSync(path.join(__dirname, "homepage.html"), "utf-8");
 
 // ---------------------------------------------------------------------------
 // Express app & transport wiring
@@ -1985,7 +1837,6 @@ app.get("/", (req, res) => {
     version: SERVER_CARD.version,
     description: SERVER_CARD.description,
     homepage: "https://mcpdns.onrender.com",
-    repository: "https://github.com/DynamycSound/mcpdns",
     endpoints: {
       mcp: "/mcp",
       health: "/health",
