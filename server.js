@@ -1300,10 +1300,12 @@ async function domainReport(domain) {
 // ---------------------------------------------------------------------------
 
 const SERVER_CARD = {
-  name: "mcp-domain-lookup",
-  displayName: "Domain Inspector",
+  serverInfo: {
+    name: "mcp-domain-lookup",
+    displayName: "Domain Inspector",
+    version: "2.0.0",
+  },
   description: "The most comprehensive domain intelligence MCP server. 15 tools for DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
-  version: "2.0.0",
   homepage: "https://mcpdns.onrender.com",
   icons: [{ src: "https://mcpdns.onrender.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] }],
   configSchema: {
@@ -1395,6 +1397,67 @@ const SERVER_CARD = {
       inputSchema: { type: "object", properties: { domain: { type: "string", description: "Domain or IP to scan" }, ports: { type: "string", description: "Comma-separated port numbers or 'common' for standard ports", default: "common" } }, required: ["domain"] },
     },
   ],
+  prompts: [
+    {
+      name: "domain-check",
+      description: "Run a full domain intelligence report with analysis and recommendations",
+      arguments: {
+        type: "object",
+        properties: {
+          domain: { type: "string", description: "Domain to analyze" }
+        },
+        required: ["domain"]
+      }
+    },
+    {
+      name: "security-audit",
+      description: "Audit the security posture of a domain",
+      arguments: {
+        type: "object",
+        properties: {
+          domain: { type: "string", description: "Domain to audit" }
+        },
+        required: ["domain"]
+      }
+    },
+    {
+      name: "compare-domains",
+      description: "Compare two domains side by side",
+      arguments: {
+        type: "object",
+        properties: {
+          domain1: { type: "string", description: "First domain" },
+          domain2: { type: "string", description: "Second domain" }
+        },
+        required: ["domain1", "domain2"]
+      }
+    },
+    {
+      name: "find-subdomains",
+      description: "Discover and analyze subdomains of a domain",
+      arguments: {
+        type: "object",
+        properties: {
+          domain: { type: "string", description: "Domain to scan" }
+        },
+        required: ["domain"]
+      }
+    }
+  ],
+  resources: [
+    {
+      uri: "info://tools",
+      name: "Tool Catalog",
+      description: "Complete list of all 15 domain intelligence tools with descriptions and parameters",
+      mimeType: "application/json"
+    },
+    {
+      uri: "info://server",
+      name: "Server Information",
+      description: "MCP Domain Lookup server metadata, version, and capabilities",
+      mimeType: "application/json"
+    }
+  ]
 };
 
 // ---------------------------------------------------------------------------
