@@ -1299,27 +1299,41 @@ async function domainReport(domain) {
 // Server card (for Smithery scanning / .well-known)
 // ---------------------------------------------------------------------------
 
+const CONFIG_SCHEMA = {
+  type: "object",
+  properties: {
+    timeout: {
+      type: "number",
+      title: "Request Timeout (ms)",
+      description: "Maximum time in milliseconds for each tool request. Default is 30000 (30 seconds).",
+      default: 30000,
+    },
+  },
+  required: [],
+};
+
 const SERVER_CARD = {
+  // Core metadata (used internally and by some scanners)
+  name: "mcp-domain-lookup",
+  displayName: "Domain Inspector",
+  description: "The most comprehensive domain intelligence MCP server. 15 tools for DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
+  version: "2.0.0",
+  homepage: "https://mcpdns.onrender.com",
+  iconUrl: "https://mcpdns.onrender.com/icon.svg",
+  icons: [{ src: "https://mcpdns.onrender.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] }],
+
+  // Static server card shape (SEP-1649 style)
   serverInfo: {
     name: "mcp-domain-lookup",
-    displayName: "Domain Inspector",
     version: "2.0.0",
   },
-  description: "The most comprehensive domain intelligence MCP server. 15 tools for DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
-  homepage: "https://mcpdns.onrender.com",
-  icons: [{ src: "https://mcpdns.onrender.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] }],
-  configSchema: {
-    type: "object",
-    properties: {
-      timeout: {
-        type: "number",
-        title: "Request Timeout (ms)",
-        description: "Maximum time in milliseconds for each tool request. Default is 30000 (30 seconds).",
-        default: 30000,
-      },
-    },
-    required: [],
+
+  // Expose both variants for maximum compatibility with Smithery + clients
+  configSchema: CONFIG_SCHEMA,
+  config: {
+    schema: CONFIG_SCHEMA,
   },
+
   tools: [
     {
       name: "domain_report",
