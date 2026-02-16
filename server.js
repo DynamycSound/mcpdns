@@ -1313,25 +1313,19 @@ const CONFIG_SCHEMA = {
 };
 
 const SERVER_CARD = {
-  // Core metadata (used internally and by some scanners)
-  name: "mcp-domain-lookup",
-  displayName: "Domain Inspector",
-  description: "The most comprehensive domain intelligence MCP server. 15 tools for DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
-  version: "2.0.0",
-  homepage: "https://mcpdns.onrender.com/about",
-  iconUrl: "https://mcpdns.onrender.com/icon.svg",
-  icons: [{ src: "https://mcpdns.onrender.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] }],
-
-  // Static server card shape (SEP-1649 style)
+  // SEP-1649 server card fields
   serverInfo: {
     name: "mcp-domain-lookup",
+    title: "Domain Inspector",
     version: "2.0.0",
   },
-
-  // Expose both variants for maximum compatibility with Smithery + clients
-  configSchema: CONFIG_SCHEMA,
-  config: {
-    schema: CONFIG_SCHEMA,
+  description: "The most comprehensive domain intelligence MCP server. 15 tools for DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
+  homepage: "https://mcpdns.onrender.com/about",
+  iconUrl: "https://mcpdns.onrender.com/icon.svg",
+  icons: [{ mimeType: "image/svg+xml", url: "https://mcpdns.onrender.com/icon.svg" }],
+  transport: {
+    type: "streamable-http",
+    endpoint: "/mcp",
   },
 
   tools: [
@@ -1771,9 +1765,9 @@ function createMcpServer() {
       contents: [{
         uri: uri.href,
         text: JSON.stringify({
-          name: SERVER_CARD.name,
-          displayName: "Domain Inspector",
-          version: SERVER_CARD.version,
+          name: SERVER_CARD.serverInfo.name,
+          displayName: SERVER_CARD.serverInfo.title,
+          version: SERVER_CARD.serverInfo.version,
           description: SERVER_CARD.description,
           toolCount: SERVER_CARD.tools.length,
           homepage: SERVER_CARD.homepage,
@@ -1885,9 +1879,14 @@ app.get("/.well-known/mcp/server-card.json", (_req, res) => {
   res.json(SERVER_CARD);
 });
 
+// --- Well-known MCP config (Smithery reads configSchema from here for external servers) ---
+app.get("/.well-known/mcp-config", (_req, res) => {
+  res.json({ configSchema: CONFIG_SCHEMA });
+});
+
 // --- Health check ---
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", tools: SERVER_CARD.tools.length, version: SERVER_CARD.version });
+  res.json({ status: "ok", tools: SERVER_CARD.tools.length, version: SERVER_CARD.serverInfo.version });
 });
 
 // --- SVG icon ---
@@ -1919,7 +1918,7 @@ app.get("/", (req, res) => {
   res.json({
     name: "mcp-domain-lookup",
     displayName: "Domain Inspector",
-    version: SERVER_CARD.version,
+    version: SERVER_CARD.serverInfo.version,
     description: SERVER_CARD.description,
     homepage: SERVER_CARD.homepage,
     endpoints: {
