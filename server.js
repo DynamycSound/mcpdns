@@ -1318,7 +1318,7 @@ const SERVER_CARD = {
   displayName: "Domain Inspector",
   description: "The most comprehensive domain intelligence MCP server. 15 tools for DNS, WHOIS, email security, SSL, HTTP headers, tech stack detection, subdomain discovery, port scanning, and more.",
   version: "2.0.0",
-  homepage: "https://mcpdns.onrender.com",
+  homepage: "https://mcpdns.onrender.com/about",
   iconUrl: "https://mcpdns.onrender.com/icon.svg",
   icons: [{ src: "https://mcpdns.onrender.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] }],
 
@@ -1776,7 +1776,7 @@ function createMcpServer() {
           version: SERVER_CARD.version,
           description: SERVER_CARD.description,
           toolCount: SERVER_CARD.tools.length,
-          homepage: "https://mcpdns.onrender.com",
+          homepage: SERVER_CARD.homepage,
         }, null, 2),
       }],
     })
@@ -1921,7 +1921,7 @@ app.get("/", (req, res) => {
     displayName: "Domain Inspector",
     version: SERVER_CARD.version,
     description: SERVER_CARD.description,
-    homepage: "https://mcpdns.onrender.com",
+    homepage: SERVER_CARD.homepage,
     endpoints: {
       mcp: "/mcp",
       health: "/health",
