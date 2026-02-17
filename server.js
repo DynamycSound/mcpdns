@@ -26,6 +26,17 @@ function cleanDomain(input) {
   return d.toLowerCase();
 }
 
+function getBaseDomain(domain) {
+  const parts = domain.split(".");
+  // For domains like www.example.com or blog.example.com → example.com
+  // For domains like example.co.uk → example.co.uk (keep 3 parts for known 2-part TLDs)
+  const twoPartTlds = ["co.uk", "com.au", "co.nz", "co.za", "com.br", "co.jp", "co.kr", "org.uk", "net.au"];
+  const last2 = parts.slice(-2).join(".");
+  if (twoPartTlds.includes(last2) && parts.length > 2) return parts.slice(-3).join(".");
+  if (parts.length > 2) return parts.slice(-2).join(".");
+  return domain;
+}
+
 async function resolveDns(domain, type) {
   try {
     const records = await resolver.resolve(domain, type);
@@ -89,9 +100,16 @@ async function dnsLookup(domain, recordType) {
 
 async function whoisLookup(domain) {
   domain = cleanDomain(domain);
-  const result = { domain, error: null };
+  const baseDomain = getBaseDomain(domain);
+  const result = { domain, queriedDomain: baseDomain !== domain ? baseDomain : domain, error: null };
   try {
-    const rec = await whoisWithRetry(domain);
+    let rec = await whoisWithRetry(domain);
+    // If subdomain WHOIS returned no useful data, try base domain
+    const hasData = rec.registrar || rec.Registrar || rec.creationDate || rec.createdDate || rec.created;
+    if (!hasData && baseDomain !== domain) {
+      rec = await whoisWithRetry(baseDomain);
+      result.queriedDomain = baseDomain;
+    }
     result.registrar = rec.registrar || rec.Registrar || "Unknown";
 
     const createdRaw = rec.creationDate || rec.createdDate || rec.created || rec.CreationDate || null;
@@ -717,16 +735,25 @@ async function techStackDetect(domain) {
 
 async function domainAge(domain) {
   domain = cleanDomain(domain);
-  const result = { domain, error: null };
+  const baseDomain = getBaseDomain(domain);
+  const result = { domain, queriedDomain: domain, error: null };
 
   try {
-    const rec = await whoisWithRetry(domain);
-    const createdRaw = rec.creationDate || rec.createdDate || rec.created || rec.CreationDate || null;
+    let rec = await whoisWithRetry(domain);
+    let createdRaw = rec.creationDate || rec.createdDate || rec.created || rec.CreationDate || null;
+
+    // If subdomain has no creation date, try base domain
+    if (!createdRaw && baseDomain !== domain) {
+      rec = await whoisWithRetry(baseDomain);
+      createdRaw = rec.creationDate || rec.createdDate || rec.created || rec.CreationDate || null;
+      result.queriedDomain = baseDomain;
+    }
+
     const updatedRaw = rec.updatedDate || rec.lastUpdated || rec.UpdatedDate || null;
     const expiryRaw = rec.registrarRegistrationExpirationDate || rec.expirationDate || rec.expiryDate || rec.expires || rec.ExpirationDate || null;
 
     if (!createdRaw) {
-      result.error = `Could not determine creation date for ${domain}`;
+      result.error = `Could not determine creation date for ${domain} or ${baseDomain}`;
       return result;
     }
 
@@ -876,26 +903,77 @@ async function domainReport(domain) {
 
   const elapsedMs = Date.now() - startTime;
 
-  // Build summary
+  // Build actionable summary — tell the user WHAT matters, not just grades
   const dnsFound = dnsData.records ? Object.values(dnsData.records).filter((v) => v !== null).length : 0;
   const techList = techData.technologies ? Object.values(techData.technologies).flat() : [];
 
-  const summary = {
-    dns: dnsFound > 0 ? `Configured (${dnsFound} record types)` : "No records",
-    whois: whoisData.created ? `Registered since ${whoisData.created}` : (whoisData.error || "Limited data"),
-    email: emailData.grade ? `Grade ${emailData.grade} (${emailData.score}/${emailData.maxScore})` : "N/A",
-    ssl: sslData.status || sslData.error || "N/A",
-    headers: headersData.grade ? `Grade ${headersData.grade} (${headersData.score}/${headersData.maxScore})` : "N/A",
-    tech: techList.length > 0 ? techList.join(", ") : "None detected",
-    age: ageData.ageDescription || ageData.error || "N/A",
-    ports: portData.openCount !== undefined ? `${portData.openCount} open, ${portData.closedCount} closed` : "N/A",
-  };
+  // Collect urgent issues and recommendations
+  const issues = [];
+  const good = [];
+
+  // DNS
+  if (dnsFound > 0) good.push(`DNS is configured with ${dnsFound} record types`);
+  else issues.push("No DNS records found - domain may not be resolving");
+
+  // SSL
+  if (sslData.status === "VALID") {
+    if (sslData.daysRemaining <= 30) issues.push(`SSL certificate expires in ${sslData.daysRemaining} days - renew soon`);
+    else good.push(`SSL valid (${sslData.issuer}, expires in ${sslData.daysRemaining} days)`);
+  } else if (sslData.status === "EXPIRED") {
+    issues.push("SSL certificate is EXPIRED - visitors will see security warnings");
+  } else if (sslData.error) {
+    issues.push(`SSL check failed: ${sslData.error}`);
+  }
+
+  // Email security - explain what's actually missing
+  if (emailData.missing && emailData.missing.length > 0) {
+    const emailIssues = [];
+    if (emailData.missing.includes("MX")) emailIssues.push("no MX records (cannot receive email)");
+    if (emailData.missing.includes("SPF")) emailIssues.push("no SPF (anyone can spoof your email)");
+    if (emailData.missing.includes("DKIM")) emailIssues.push("no DKIM (emails not cryptographically signed)");
+    if (emailData.missing.includes("DMARC")) emailIssues.push("no DMARC (no policy to reject spoofed emails)");
+    issues.push(`Email security: ${emailIssues.join(", ")}`);
+  } else if (emailData.score === emailData.maxScore) {
+    good.push("Email security fully configured (MX, SPF, DKIM, DMARC)");
+  }
+
+  // HTTP headers - explain what's actually missing
+  if (headersData.critical) {
+    const missingCritical = headersData.critical.filter((h) => !h.present).map((h) => h.header);
+    if (missingCritical.length > 0) {
+      issues.push(`Missing security headers: ${missingCritical.join(", ")} - site vulnerable to XSS, clickjacking, MIME sniffing`);
+    } else {
+      good.push("All critical security headers present");
+    }
+  }
+
+  // WHOIS / Age
+  if (whoisData.created) good.push(`Registered since ${whoisData.created}`);
+  if (whoisData.daysUntilExpiry && whoisData.daysUntilExpiry <= 90) issues.push(`Domain expires in ${whoisData.daysUntilExpiry} days - renew soon`);
+  if (ageData.ageDescription) good.push(`Domain age: ${ageData.ageDescription}`);
+
+  // Ports
+  if (portData.insights) {
+    for (const insight of portData.insights) {
+      if (insight.includes("security risk")) issues.push(insight);
+      else good.push(insight);
+    }
+  }
+
+  // Tech
+  if (techList.length > 0) good.push(`Tech stack: ${techList.join(", ")}`);
 
   return {
     domain,
     generatedAt: new Date().toISOString(),
     elapsedMs,
-    summary,
+    issues,
+    good,
+    scores: {
+      email: emailData.grade ? { grade: emailData.grade, score: emailData.score, max: emailData.maxScore, missing: emailData.missing } : null,
+      headers: headersData.grade ? { grade: headersData.grade, score: headersData.score, max: headersData.maxScore } : null,
+      ssl: sslData.status || null,
+    },
     sections: {
       dns: dnsData,
       whois: whoisData,
