@@ -1486,7 +1486,156 @@ const PRIVACY_HTML = fs.readFileSync(path.join(__dirname, "privacy.html"), "utf-
 // ---------------------------------------------------------------------------
 
 const app = express();
-app.use(express.json());
+app.set("trust proxy", true);
+app.use(express.json({ limit: "1mb" }));
+
+// ---------------------------------------------------------------------------
+// Transparent request + usage logging
+// ---------------------------------------------------------------------------
+// Logs are JSON lines so Render logs can be filtered/searched easily.
+// We intentionally do not log authorization headers or full MCP session IDs.
+
+function getClientIp(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor.length > 0) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || "unknown";
+}
+
+function truncate(value, max = 240) {
+  if (value === undefined || value === null) return null;
+  const str = String(value);
+  return str.length > max ? `${str.slice(0, max)}…` : str;
+}
+
+function redactSessionId(sessionId) {
+  if (!sessionId) return null;
+  const str = String(sessionId);
+  if (str.length <= 8) return "present";
+  return `${str.slice(0, 4)}…${str.slice(-4)}`;
+}
+
+function safeQuery(query) {
+  const result = {};
+  for (const [key, value] of Object.entries(query || {})) {
+    result[key] = Array.isArray(value) ? value.map((v) => truncate(v, 120)) : truncate(value, 120);
+  }
+  return result;
+}
+
+function getHeaderSnapshot(req) {
+  return {
+    host: truncate(req.headers.host),
+    userAgent: truncate(req.headers["user-agent"]),
+    referer: truncate(req.headers.referer || req.headers.referrer),
+    origin: truncate(req.headers.origin),
+    accept: truncate(req.headers.accept),
+    contentType: truncate(req.headers["content-type"]),
+    secFetchSite: truncate(req.headers["sec-fetch-site"]),
+    forwardedHost: truncate(req.headers["x-forwarded-host"]),
+    forwardedProto: truncate(req.headers["x-forwarded-proto"]),
+    mcpSessionId: redactSessionId(req.headers["mcp-session-id"]),
+  };
+}
+
+function inferSource(req) {
+  const haystack = [
+    req.headers["user-agent"],
+    req.headers.referer,
+    req.headers.referrer,
+    req.headers.origin,
+    req.headers.host,
+    req.headers["x-forwarded-host"],
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  const checks = [
+    ["smithery", "Smithery"],
+    ["mcp.so", "MCP.so"],
+    ["mcpstore", "MCP Store"],
+    ["mcpmarket", "MCP Market"],
+    ["pulsemcp", "PulseMCP"],
+    ["glama", "Glama"],
+    ["lobehub", "LobeHub"],
+    ["cursor", "Cursor"],
+    ["claude", "Claude"],
+    ["anthropic", "Anthropic/Claude"],
+    ["vscode", "VS Code"],
+    ["windsurf", "Windsurf"],
+    ["github", "GitHub"],
+    ["render", "Render"],
+    ["uptime", "Uptime monitor"],
+    ["bot", "Bot/Crawler"],
+    ["spider", "Bot/Crawler"],
+    ["crawler", "Bot/Crawler"],
+    ["curl", "curl"],
+    ["python-requests", "Python requests"],
+  ];
+
+  for (const [needle, label] of checks) {
+    if (haystack.includes(needle)) {
+      return { sourceGuess: label, sourceEvidence: needle };
+    }
+  }
+
+  if (req.path === "/.well-known/mcp/server-card.json" || req.path === "/.well-known/mcp-config") {
+    return { sourceGuess: "MCP discovery probe", sourceEvidence: req.path };
+  }
+  if (req.path === "/health") {
+    return { sourceGuess: "Health check / uptime probe", sourceEvidence: req.path };
+  }
+  if (req.path === "/mcp") {
+    return { sourceGuess: "MCP client", sourceEvidence: req.method };
+  }
+  if (req.path.startsWith("/api/")) {
+    return { sourceGuess: "REST API client", sourceEvidence: req.path };
+  }
+
+  return { sourceGuess: "Unknown", sourceEvidence: null };
+}
+
+function logEvent(event, fields = {}) {
+  console.log(JSON.stringify({ time: new Date().toISOString(), event, ...fields }));
+}
+
+function getRpcSummary(body) {
+  const method = body?.method || null;
+  const toolName = method === "tools/call" ? body?.params?.name || null : null;
+  const toolArgs = method === "tools/call" ? body?.params?.arguments || {} : {};
+  const clientInfo = method === "initialize" ? body?.params?.clientInfo || null : null;
+  return {
+    rpcMethod: method,
+    rpcId: body?.id ?? null,
+    toolName,
+    toolArgs: safeQuery(toolArgs),
+    clientInfo,
+  };
+}
+
+app.use((req, res, next) => {
+  const started = Date.now();
+  const requestId = crypto.randomUUID();
+  req.requestId = requestId;
+  res.setHeader("x-request-id", requestId);
+
+  res.on("finish", () => {
+    const inferred = inferSource(req);
+    logEvent("http_request", {
+      requestId,
+      method: req.method,
+      path: req.path,
+      originalUrl: truncate(req.originalUrl, 500),
+      status: res.statusCode,
+      durationMs: Date.now() - started,
+      ip: getClientIp(req),
+      ...inferred,
+      headers: getHeaderSnapshot(req),
+      query: safeQuery(req.query),
+    });
+  });
+
+  next();
+});
 
 // Session store: mcp-session-id → transport
 // NOTE: In production with multiple instances, replace with Redis or similar shared store.
@@ -1497,6 +1646,17 @@ const sessions = new Map();
 app.post("/mcp", async (req, res) => {
   try {
     const sessionId = req.headers["mcp-session-id"];
+    const rpcSummary = getRpcSummary(req.body);
+
+    logEvent("mcp_post", {
+      requestId: req.requestId,
+      ip: getClientIp(req),
+      source: inferSource(req),
+      sessionKnown: Boolean(sessionId && sessions.has(sessionId)),
+      sessionId: redactSessionId(sessionId),
+      headers: getHeaderSnapshot(req),
+      ...rpcSummary,
+    });
 
     if (sessionId && sessions.has(sessionId)) {
       // Existing session
@@ -1507,6 +1667,12 @@ app.post("/mcp", async (req, res) => {
 
     // Only allow new sessions for initialize requests
     if (!isInitializeRequest(req.body)) {
+      logEvent("mcp_rejected", {
+        requestId: req.requestId,
+        reason: "missing_or_invalid_session",
+        rpcMethod: rpcSummary.rpcMethod,
+        sessionId: redactSessionId(sessionId),
+      });
       res.status(400).json({
         jsonrpc: "2.0",
         error: { code: -32000, message: "Bad Request: No valid session ID provided. Send an initialize request first." },
@@ -1521,12 +1687,25 @@ app.post("/mcp", async (req, res) => {
       sessionIdGenerator: () => crypto.randomUUID(),
       onsessioninitialized: (id) => {
         sessions.set(id, transport);
+        logEvent("mcp_session_initialized", {
+          requestId: req.requestId,
+          sessionId: redactSessionId(id),
+          ip: getClientIp(req),
+          source: inferSource(req),
+          clientInfo: rpcSummary.clientInfo,
+          activeSessions: sessions.size,
+        });
       },
     });
 
     transport.onclose = () => {
       const id = transport.sessionId;
       if (id) sessions.delete(id);
+      logEvent("mcp_session_closed", {
+        requestId: req.requestId,
+        sessionId: redactSessionId(id),
+        activeSessions: sessions.size,
+      });
     };
 
     await server.connect(transport);
@@ -1546,7 +1725,20 @@ app.post("/mcp", async (req, res) => {
 // --- GET /mcp — SSE stream for an existing session ---
 app.get("/mcp", async (req, res) => {
   const sessionId = req.headers["mcp-session-id"];
+  logEvent("mcp_stream_open", {
+    requestId: req.requestId,
+    ip: getClientIp(req),
+    source: inferSource(req),
+    sessionKnown: Boolean(sessionId && sessions.has(sessionId)),
+    sessionId: redactSessionId(sessionId),
+    headers: getHeaderSnapshot(req),
+  });
   if (!sessionId || !sessions.has(sessionId)) {
+    logEvent("mcp_rejected", {
+      requestId: req.requestId,
+      reason: "invalid_or_missing_session_for_stream",
+      sessionId: redactSessionId(sessionId),
+    });
     res.status(400).json({ error: "Invalid or missing session. Send an initialize request first." });
     return;
   }
@@ -1557,13 +1749,30 @@ app.get("/mcp", async (req, res) => {
 // --- DELETE /mcp — session cleanup ---
 app.delete("/mcp", async (req, res) => {
   const sessionId = req.headers["mcp-session-id"];
+  logEvent("mcp_session_delete_requested", {
+    requestId: req.requestId,
+    ip: getClientIp(req),
+    source: inferSource(req),
+    sessionKnown: Boolean(sessionId && sessions.has(sessionId)),
+    sessionId: redactSessionId(sessionId),
+  });
   if (!sessionId || !sessions.has(sessionId)) {
+    logEvent("mcp_rejected", {
+      requestId: req.requestId,
+      reason: "invalid_or_missing_session_for_delete",
+      sessionId: redactSessionId(sessionId),
+    });
     res.status(400).json({ error: "Invalid or missing session." });
     return;
   }
   const transport = sessions.get(sessionId);
   await transport.handleRequest(req, res);
   sessions.delete(sessionId);
+  logEvent("mcp_session_deleted", {
+    requestId: req.requestId,
+    sessionId: redactSessionId(sessionId),
+    activeSessions: sessions.size,
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1589,21 +1798,72 @@ const TOOL_MAP = {
 };
 
 app.get("/api/:tool", async (req, res) => {
-  const tool = TOOL_MAP[req.params.tool];
-  if (!tool) return res.status(404).json({ error: `Unknown tool: ${req.params.tool}`, availableTools: Object.keys(TOOL_MAP) });
-  const needsDomain = !["redirect-chain", "reverse-dns", "dns-compare"].includes(req.params.tool);
-  if (needsDomain && !req.query.domain) return res.status(400).json({ error: "Missing required query parameter: domain", example: `/api/${req.params.tool}?domain=example.com` });
-  if (req.params.tool === "dns-compare" && (!req.query.domain1 || !req.query.domain2)) return res.status(400).json({ error: "Missing required query parameters: domain1, domain2" });
+  const toolName = req.params.tool;
+  const tool = TOOL_MAP[toolName];
+
+  logEvent("rest_tool_requested", {
+    requestId: req.requestId,
+    toolName,
+    ip: getClientIp(req),
+    source: inferSource(req),
+    headers: getHeaderSnapshot(req),
+    query: safeQuery(req.query),
+  });
+
+  if (!tool) {
+    logEvent("rest_tool_rejected", {
+      requestId: req.requestId,
+      toolName,
+      reason: "unknown_tool",
+    });
+    return res.status(404).json({ error: `Unknown tool: ${toolName}`, availableTools: Object.keys(TOOL_MAP) });
+  }
+
+  const needsDomain = !["redirect-chain", "reverse-dns", "dns-compare"].includes(toolName);
+  if (needsDomain && !req.query.domain) {
+    logEvent("rest_tool_rejected", {
+      requestId: req.requestId,
+      toolName,
+      reason: "missing_domain",
+    });
+    return res.status(400).json({ error: "Missing required query parameter: domain", example: `/api/${toolName}?domain=example.com` });
+  }
+  if (toolName === "dns-compare" && (!req.query.domain1 || !req.query.domain2)) {
+    logEvent("rest_tool_rejected", {
+      requestId: req.requestId,
+      toolName,
+      reason: "missing_compare_domains",
+    });
+    return res.status(400).json({ error: "Missing required query parameters: domain1, domain2" });
+  }
+
   try {
     const data = await tool(req.query);
+    logEvent("rest_tool_completed", {
+      requestId: req.requestId,
+      toolName,
+      domain: truncate(req.query.domain || req.query.target || req.query.domain1),
+      source: inferSource(req),
+    });
     res.json(data);
   } catch (err) {
+    logEvent("rest_tool_failed", {
+      requestId: req.requestId,
+      toolName,
+      error: err.message,
+    });
     res.status(500).json({ error: err.message });
   }
 });
 
 // --- API index ---
-app.get("/api", (_req, res) => {
+app.get("/api", (req, res) => {
+  logEvent("api_index_requested", {
+    requestId: req.requestId,
+    ip: getClientIp(req),
+    source: inferSource(req),
+    headers: getHeaderSnapshot(req),
+  });
   res.json({
     description: "Domain Inspector REST API. Use any tool via simple GET requests.",
     baseUrl: "https://mcpdns.onrender.com/api",
@@ -1615,41 +1875,64 @@ app.get("/api", (_req, res) => {
 });
 
 // --- Well-known server card ---
-app.get("/.well-known/mcp/server-card.json", (_req, res) => {
+app.get("/.well-known/mcp/server-card.json", (req, res) => {
+  logEvent("mcp_discovery_requested", {
+    requestId: req.requestId,
+    ip: getClientIp(req),
+    source: inferSource(req),
+    headers: getHeaderSnapshot(req),
+  });
   res.json(SERVER_CARD);
 });
 
 // --- Well-known MCP config (Smithery reads configSchema from here for external servers) ---
-app.get("/.well-known/mcp-config", (_req, res) => {
+app.get("/.well-known/mcp-config", (req, res) => {
+  logEvent("mcp_config_requested", {
+    requestId: req.requestId,
+    ip: getClientIp(req),
+    source: inferSource(req),
+    headers: getHeaderSnapshot(req),
+  });
   res.json({ configSchema: CONFIG_SCHEMA });
 });
 
 // --- Health check ---
-app.get("/health", (_req, res) => {
+app.get("/health", (req, res) => {
+  logEvent("health_check", {
+    requestId: req.requestId,
+    ip: getClientIp(req),
+    source: inferSource(req),
+    headers: getHeaderSnapshot(req),
+  });
   res.json({ status: "ok", tools: SERVER_CARD.tools.length, version: SERVER_CARD.serverInfo.version });
 });
 
 // --- SVG icon ---
 const ICON_SVG = `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="22" stroke="#6366f1" stroke-width="2" opacity=".3"/><circle cx="24" cy="24" r="15" stroke="#818cf8" stroke-width="2"/><circle cx="24" cy="24" r="4" fill="#818cf8"/><line x1="24" y1="2" x2="24" y2="46" stroke="#6366f1" stroke-width="1" opacity=".3"/><ellipse cx="24" cy="24" rx="10" ry="22" stroke="#6366f1" stroke-width="1" opacity=".3"/></svg>`;
-app.get("/icon.svg", (_req, res) => {
+app.get("/icon.svg", (req, res) => {
+  logEvent("asset_requested", { requestId: req.requestId, asset: "icon.svg", ip: getClientIp(req), source: inferSource(req) });
   res.type("image/svg+xml").send(ICON_SVG);
 });
 
 // --- Homepage ---
-app.get("/about", (_req, res) => {
+app.get("/about", (req, res) => {
+  logEvent("page_requested", { requestId: req.requestId, page: "about", ip: getClientIp(req), source: inferSource(req), headers: getHeaderSnapshot(req) });
   res.type("html").send(HOMEPAGE_HTML);
 });
 
 // --- Legal pages ---
-app.get("/terms", (_req, res) => {
+app.get("/terms", (req, res) => {
+  logEvent("page_requested", { requestId: req.requestId, page: "terms", ip: getClientIp(req), source: inferSource(req), headers: getHeaderSnapshot(req) });
   res.type("html").send(TERMS_HTML);
 });
-app.get("/privacy", (_req, res) => {
+app.get("/privacy", (req, res) => {
+  logEvent("page_requested", { requestId: req.requestId, page: "privacy", ip: getClientIp(req), source: inferSource(req), headers: getHeaderSnapshot(req) });
   res.type("html").send(PRIVACY_HTML);
 });
 
 // --- Root — serve homepage for browsers, JSON for API clients ---
 app.get("/", (req, res) => {
+  logEvent("root_requested", { requestId: req.requestId, ip: getClientIp(req), source: inferSource(req), headers: getHeaderSnapshot(req) });
   const accept = req.headers.accept || "";
   if (accept.includes("text/html")) {
     res.type("html").send(HOMEPAGE_HTML);
