@@ -1598,6 +1598,25 @@ function logEvent(event, fields = {}) {
   console.log(JSON.stringify({ time: new Date().toISOString(), event, ...fields }));
 }
 
+function shouldLogHealthChecks() {
+  return String(process.env.LOG_HEALTH_CHECKS || "").toLowerCase() === "true";
+}
+
+function isHealthCheckRequest(req) {
+  return req.path === "/health";
+}
+
+function isRenderHealthCheck(req) {
+  return isHealthCheckRequest(req) && String(req.headers["user-agent"] || "").toLowerCase().includes("render");
+}
+
+function shouldSkipRequestLog(req) {
+  // Render can call /health repeatedly during deploys and uptime checks. Keep
+  // usage logs focused on real clients, MCP discovery, and tool calls by
+  // hiding health checks unless explicitly enabled.
+  return isHealthCheckRequest(req) && !shouldLogHealthChecks();
+}
+
 function getRpcSummary(body) {
   const method = body?.method || null;
   const toolName = method === "tools/call" ? body?.params?.name || null : null;
@@ -1619,6 +1638,8 @@ app.use((req, res, next) => {
   res.setHeader("x-request-id", requestId);
 
   res.on("finish", () => {
+    if (shouldSkipRequestLog(req)) return;
+
     const inferred = inferSource(req);
     logEvent("http_request", {
       requestId,
@@ -1898,12 +1919,15 @@ app.get("/.well-known/mcp-config", (req, res) => {
 
 // --- Health check ---
 app.get("/health", (req, res) => {
-  logEvent("health_check", {
-    requestId: req.requestId,
-    ip: getClientIp(req),
-    source: inferSource(req),
-    headers: getHeaderSnapshot(req),
-  });
+  if (shouldLogHealthChecks()) {
+    logEvent("health_check", {
+      requestId: req.requestId,
+      ip: getClientIp(req),
+      source: inferSource(req),
+      renderHealthCheck: isRenderHealthCheck(req),
+      headers: getHeaderSnapshot(req),
+    });
+  }
   res.json({ status: "ok", tools: SERVER_CARD.tools.length, version: SERVER_CARD.serverInfo.version });
 });
 

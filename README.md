@@ -54,6 +54,8 @@ Logged events include:
 - `rest_tool_requested`, `rest_tool_completed`, `rest_tool_failed` — REST API tool usage
 - `health_check`, `root_requested`, `page_requested` — health checks and page views
 
+Health checks are skipped by default to keep Render logs quiet. Set `LOG_HEALTH_CHECKS=true` if you want to include `/health` requests in the logs while debugging deploy or uptime behavior.
+
 Each request gets an `x-request-id` response header and a matching `requestId` in logs, making it easier to connect lifecycle/tool events to the final HTTP request log.
 
 The logs include a best-effort `sourceGuess` / `sourceEvidence` based on user-agent, referer, origin, host, and path. This can identify likely traffic from common MCP directories/clients such as Smithery, MCP.so, MCP Store, MCP Market, PulseMCP, Glama, LobeHub, Cursor, Claude, VS Code, Windsurf, uptime checks, or generic bots. If a directory or client does not send an identifying user-agent/referer, attribution may remain `Unknown`, `MCP client`, or `MCP discovery probe`.
